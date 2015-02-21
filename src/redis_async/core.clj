@@ -20,60 +20,58 @@
     (write-ln connection (str "$" (count p)))
     (write-ln connection p)))
 
-(defn- parse-response-lines [lines]
-  (loop [responses      []
-         [line & lines] lines]
-    (if-not line
-      responses
-      (let [rest-of-line (subs line 1)]
-        (case (first line)
-          \+ (recur (conj responses rest-of-line) lines)
-          \- (recur (conj responses {:error rest-of-line}) lines)
-          \: (recur (conj responses (Long. rest-of-line)) lines)
-          \$ (let [[next-line & lines] lines]
-               (recur (if (empty? next-line)
-                        nil
-                        (conj responses next-line))
-                      lines))
-          \* (let [ary-size (Long. rest-of-line)
-                   ary      (parse-response-lines (take ary-size lines))]
-               (when (= (count ary) ary-size)
+(defn- parse-response-lines [lines num-responses]
+  (loop [responses []
+         lines     lines]
+    (let [c-resp (count responses)
+          more-remaining? (> (- num-responses c-resp) 1)]
+      (if (= c-resp num-responses)
+        [responses lines]
+        (let [line         (first lines)
+              rest-of-line (subs line 1)
+              lines        (drop 1 lines)]
+          (case (first line)
+            \+ (recur (conj responses rest-of-line) lines)
+            \- (recur (conj responses {:error rest-of-line}) lines)
+            \: (recur (conj responses (Long. rest-of-line)) lines)
+            \$ (let [next-line       (first lines)
+                     remaining-lines (drop 1 lines)]
+                 (recur (conj responses next-line)
+                        remaining-lines))
+            \* (let [ary-size    (Long. rest-of-line)
+                     [ary lines] (parse-response-lines lines ary-size)]
                  (recur (conj responses ary)
-                        (drop ary-size lines)))))))))
+                        lines))))))))
 
-(defn- parse-responses [^String body num-responses]
+(defn- parse-responses [lines num-responses]
   (try
-    (when (.endsWith body "\r\n")
-      (let [responses (parse-response-lines (s/split body #"\r\n"))]
-        (when (= (count responses) num-responses)
-          responses)))
+    (first (parse-response-lines lines num-responses))
     (catch NumberFormatException _ nil)))
+
+(def ^:private max-response-size 10000)
+
+(defn- stream-seq->line-seq [stream-seq & [remains]]
+  (let [first-chunk    (first stream-seq)
+        ^String string (convert first-chunk String)
+        [line & lines] (s/split string #"\r\n")
+        lines          (cons (str remains line) lines)]
+    (if (.endsWith string "\r\n")
+      (concat lines (lazy-seq (stream-seq->line-seq (next stream-seq))))
+      (concat (butlast lines)
+              (lazy-seq (stream-seq->line-seq (next stream-seq) (last lines)))))))
 
 (defn- read-response
   "Read from a connection, then write to ret-c"
-  [body connection ret-c num-responses]
-  (if-let [response (parse-responses body num-responses)]
-    (do
-      (a/put! ret-c (if (= num-responses 1)
-                      (first response)
-                      response))
-      (a/close! ret-c))
-    (-> connection
-        stream/take!
-        (d/on-realized
-         (fn [x]
-           (read-response (str body (convert x String))
-                          connection
-                          ret-c
-                          num-responses))
-         (fn [x]
-           (println "ERROR:" x)
-           (a/close! ret-c))))))
+  [connection ret-c num-responses]
+  (let [stream-seq (stream/stream->seq connection)
+        line-seq   (stream-seq->line-seq stream-seq)]
+    (a/put! ret-c (parse-responses line-seq num-responses)))
+  (a/close! ret-c))
 
 (defn- do-cmd [connection {:keys [ret-c cmds]}]
   (doseq [cmd cmds]
     (write-cmd connection cmd))
-  (read-response "" connection ret-c (count cmds)))
+  (read-response connection ret-c (count cmds)))
 
 (defn open-connection [redis]
   (let [redis      (merge default-redis redis)
@@ -91,9 +89,15 @@
 
 (def ^:dynamic pipe nil)
 
+(defn- coerce-to-string [param]
+  (cond
+   (string? param) param
+   (keyword? param) (name param)
+   :else (str param)))
+
 (defn send-cmd [redis command & params]
   (let [cmd-ch   (:command-channel redis)
-        full-cmd (cons command params)]
+        full-cmd (cons (s/upper-case command) (map coerce-to-string params))]
     (if pipe
       (swap! pipe conj full-cmd)
       (let [ch (a/chan)]
