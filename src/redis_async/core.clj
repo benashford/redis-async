@@ -1,24 +1,26 @@
 (ns redis-async.core
-  (:require [clojure.string :as s]
-            [clojure.core.async :as a]
-            [aleph.tcp :as tcp]
+  (:require [aleph.tcp :as tcp]
             [byte-streams :refer [convert]]
+            [clojure.core.async :as a]
+            [clojure.string :as s]
             [manifold.deferred :as d]
-            [manifold.stream :as stream]))
+            [manifold.stream :as stream]
+            [gloss.core :as gloss]
+            [gloss.io :as io]))
 
 (def ^:private default-redis
   {:host "localhost"
    :port 6379})
 
-(defn- write-ln [connection line]
-  (let [full-line (str line "\r\n")]
-    (stream/put! connection full-line)))
+(def ^:private resp-frame (gloss/string :utf-8 :delimiters ["\r\n"]))
 
 (defn- write-cmd [connection cmd]
-  (write-ln connection (str "*" (count cmd)))
-  (doseq [p cmd]
-    (write-ln connection (str "$" (count p)))
-    (write-ln connection p)))
+  (let [cmd-lines (cons (str "*" (count cmd))
+                        (mapcat (fn [p]
+                                  [(str "$" (count p)) p])
+                                cmd))
+        bytes (io/encode-all resp-frame cmd-lines)]
+    (stream/put! connection (io/contiguous bytes))))
 
 (defn- parse-response-lines [lines num-responses]
   (loop [responses []
@@ -48,46 +50,36 @@
     (first (parse-response-lines lines num-responses))
     (catch NumberFormatException _ nil)))
 
-(def ^:private max-response-size 10000)
-
-(defn- stream-seq->line-seq [stream-seq & [remains]]
-  (let [first-chunk    (first stream-seq)
-        ^String string (convert first-chunk String)
-        [line & lines] (s/split string #"\r\n")
-        lines          (cons (str remains line) lines)]
-    (if (.endsWith string "\r\n")
-      (concat lines (lazy-seq (stream-seq->line-seq (next stream-seq))))
-      (concat (butlast lines)
-              (lazy-seq (stream-seq->line-seq (next stream-seq) (last lines)))))))
-
 (defn- read-response
   "Read from a connection, then write to ret-c"
-  [connection ret-c num-responses]
-  (let [stream-seq (stream/stream->seq connection)
-        line-seq   (stream-seq->line-seq stream-seq)]
-    (a/put! ret-c (parse-responses line-seq num-responses)))
+  [in-stream ret-c num-responses]
+  (let [stream-seq (stream/stream->seq in-stream)]
+    (a/put! ret-c (parse-responses stream-seq num-responses)))
   (a/close! ret-c))
 
-(defn- do-cmd [connection {:keys [ret-c cmds]}]
+(defn- do-cmd [connection in-stream {:keys [ret-c cmds]}]
   (doseq [cmd cmds]
     (write-cmd connection cmd))
-  (read-response connection ret-c (count cmds)))
+  (read-response in-stream ret-c (count cmds)))
 
 (defn open-connection [redis]
   (let [redis      (merge default-redis redis)
         connection @(tcp/client redis)
+        in-stream  (io/decode-stream connection resp-frame)
         cmd-ch     (a/chan)]
-    (a/go
-      (loop [cmd (a/<! cmd-ch)]
+    (a/thread
+      (loop [cmd (a/<!! cmd-ch)]
         (if-not cmd
           nil
           (do
-            (do-cmd connection cmd)
-            (recur (a/<! cmd-ch))))))
+            (do-cmd connection in-stream cmd)
+            (recur (a/<!! cmd-ch))))))
     (assoc redis
-      :command-channel cmd-ch)))
+      :command-channel cmd-ch
+      ::connection connection)))
 
-(def ^:dynamic pipe nil)
+(def ^:dynamic *pipe* nil)
+(def ^:dynamic *redis* nil)
 
 (defn- coerce-to-string [param]
   (cond
@@ -97,9 +89,9 @@
 
 (defn send-cmd [redis command & params]
   (let [cmd-ch   (:command-channel redis)
-        full-cmd (cons (s/upper-case command) (map coerce-to-string params))]
-    (if pipe
-      (swap! pipe conj full-cmd)
+        full-cmd (cons command (map coerce-to-string params))]
+    (if *pipe*
+      (swap! *pipe* conj full-cmd)
       (let [ch (a/chan)]
         (a/put! cmd-ch {:ret-c ch
                         :cmds  [full-cmd]})
@@ -109,10 +101,11 @@
   (let [cmd-ch (:command-channel redis)
         ch     (a/chan)]
     (a/put! cmd-ch {:ret-c ch
-                    :cmds  @pipe})
+                    :cmds  @*pipe*})
     ch))
 
 (defmacro pipelined [redis & body]
-  `(binding [pipe (atom [])]
+  `(binding [*pipe*  (atom [])
+             *redis* redis]
      ~@body
      (flush-pipe ~redis)))
