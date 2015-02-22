@@ -53,8 +53,11 @@
 (defn- read-response
   "Read from a connection, then write to ret-c"
   [in-stream ret-c num-responses]
-  (let [stream-seq (stream/stream->seq in-stream)]
-    (a/put! ret-c (parse-responses stream-seq num-responses)))
+  (let [stream-seq (stream/stream->seq in-stream)
+        responses  (parse-responses stream-seq num-responses)]
+    (a/put! ret-c (if (> (count responses) 1)
+                    responses
+                    (first responses))))
   (a/close! ret-c))
 
 (defn- do-cmd [connection in-stream {:keys [ret-c cmds]}]
@@ -89,7 +92,7 @@
 
 (defn send-cmd [redis command & params]
   (let [cmd-ch   (:command-channel redis)
-        full-cmd (cons command (map coerce-to-string params))]
+        full-cmd (concat command (map coerce-to-string params))]
     (if *pipe*
       (swap! *pipe* conj full-cmd)
       (let [ch (a/chan)]

@@ -6,22 +6,32 @@
   (let [cmd (as-> fn-n x
                   (name x)
                   (s/split x #"-")
-                  (s/join " " x)
-                  (s/upper-case x))]
+                  (mapv s/upper-case x))]
     `(defn ~fn-n [~'redis & ~'params]
        (apply send-cmd ~'redis ~cmd ~'params))))
 
-;; Connection
+;; Commands
 
-(defredis auth)
-(defredis echo)
-(defredis ping)
-(defredis quit)
-(defredis select)
-
-;; Server
-
-(doseq [cmd ['bgrewriteaof
+(def connection ['auth 'echo 'ping 'quit 'select])
+(def server ['bgrewriteaof
              'bgsave
-             'command]]
+             'client-kill
+             'client-list
+             'client-getname
+             'client-pause
+             'client-setname
+             'cluster-slots
+             'command
+             'command-count
+             'command-getkeys
+             'command-info
+             'config-get
+             'config-rewrite
+             'config-set
+             'config-resetstat
+             'dbsize
+             'debug-object])
+
+(doseq [range [connection server]
+        cmd   range]
   (eval `(defredis ~cmd)))
