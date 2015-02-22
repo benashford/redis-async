@@ -25,25 +25,25 @@
 (defn- parse-response-lines [lines num-responses]
   (loop [responses []
          lines     lines]
-    (let [c-resp (count responses)
-          more-remaining? (> (- num-responses c-resp) 1)]
-      (if (= c-resp num-responses)
-        [responses lines]
-        (let [line         (first lines)
-              rest-of-line (subs line 1)
-              lines        (drop 1 lines)]
-          (case (first line)
-            \+ (recur (conj responses rest-of-line) lines)
-            \- (recur (conj responses {:error rest-of-line}) lines)
-            \: (recur (conj responses (Long. rest-of-line)) lines)
-            \$ (let [next-line       (first lines)
-                     remaining-lines (drop 1 lines)]
-                 (recur (conj responses next-line)
-                        remaining-lines))
-            \* (let [ary-size    (Long. rest-of-line)
-                     [ary lines] (parse-response-lines lines ary-size)]
-                 (recur (conj responses ary)
-                        lines))))))))
+    (if (= (count responses) num-responses)
+      [responses lines]
+      (let [line         (first lines)
+            rest-of-line (subs line 1)
+            lines        (drop 1 lines)]
+        (case (first line)
+          \+ (recur (conj responses rest-of-line) lines)
+          \- (recur (conj responses {:error rest-of-line}) lines)
+          \: (recur (conj responses (Long. rest-of-line)) lines)
+          \$ (let [str-size (Long. rest-of-line)]
+               (if (< str-size 0)
+                 (recur (conj responses nil)
+                        lines)
+                 (recur (conj responses (first lines))
+                        (drop 1 lines))))
+          \* (let [ary-size    (Long. rest-of-line)
+                   [ary lines] (parse-response-lines lines ary-size)]
+               (recur (conj responses ary)
+                      lines)))))))
 
 (defn- parse-responses [lines num-responses]
   (try
@@ -57,7 +57,9 @@
         responses  (parse-responses stream-seq num-responses)]
     (a/put! ret-c (if (> (count responses) 1)
                     responses
-                    (first responses))))
+                    (if-let [r (first responses)]
+                      r
+                      [nil]))))
   (a/close! ret-c))
 
 (defn- do-cmd [connection in-stream {:keys [ret-c cmds]}]

@@ -1,4 +1,5 @@
 (ns redis-async.client
+  (:refer-clojure :excludes [time sync keys])
   (:require [clojure.string :as s]
             [redis-async.core :refer :all]))
 
@@ -12,6 +13,20 @@
 
 ;; Commands
 
+(def keys ['del
+           'dump
+           'exists
+           'expire
+           'expireat
+           'keys
+           'migrate
+           'move
+           'object
+           'persist
+           'pexpire
+           'pexpireat
+           'pttl
+           'randomkey])
 (def connection ['auth 'echo 'ping 'quit 'select])
 (def server ['bgrewriteaof
              'bgsave
@@ -30,8 +45,22 @@
              'config-set
              'config-resetstat
              'dbsize
-             'debug-object])
+             'debug-object
+             'debug-segfault
+             'flushall
+             'flushdb
+             'info
+             'lastsave
+             ;'monitor
+             'role
+             'save
+             'shutdown
+             'slaveof
+             'slowlog
+             'sync
+             'time
+             ])
 
-(doseq [range [connection server]
+(doseq [range [keys connection server]
         cmd   range]
   (eval `(defredis ~cmd)))
