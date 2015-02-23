@@ -12,43 +12,19 @@
   {:host "localhost"
    :port 6379})
 
-(def ^:private resp-frame (gloss/string :utf-8 :delimiters ["\r\n"]))
+;; unify with real-frame
+(def ^:private resp-frame-out (gloss/string :utf-8 :delimiters ["\r\n"]))
 
 (defn- write-cmd [connection cmd]
   (let [cmd-lines (cons (str "*" (count cmd))
                         (mapcat (fn [p]
                                   [(str "$" (count p)) p])
                                 cmd))
-        bytes (io/encode-all resp-frame cmd-lines)]
+        bytes (io/encode-all resp-frame-out cmd-lines)]
     (stream/put! connection (io/contiguous bytes))))
 
-(defn- parse-response-lines [lines num-responses]
-  (loop [responses []
-         lines     lines]
-    (if (= (count responses) num-responses)
-      [responses lines]
-      (let [line         (first lines)
-            rest-of-line (subs line 1)
-            lines        (drop 1 lines)]
-        (case (first line)
-          \+ (recur (conj responses rest-of-line) lines)
-          \- (recur (conj responses {:error rest-of-line}) lines)
-          \: (recur (conj responses (Long. rest-of-line)) lines)
-          \$ (let [str-size (Long. rest-of-line)]
-               (if (< str-size 0)
-                 (recur (conj responses nil)
-                        lines)
-                 (recur (conj responses (first lines))
-                        (drop 1 lines))))
-          \* (let [ary-size    (Long. rest-of-line)
-                   [ary lines] (parse-response-lines lines ary-size)]
-               (recur (conj responses ary)
-                      lines)))))))
-
 (defn- parse-responses [lines num-responses]
-  (try
-    (first (parse-response-lines lines num-responses))
-    (catch NumberFormatException _ nil)))
+  (take num-responses lines))
 
 (defn- read-response
   "Read from a connection, then write to ret-c"
@@ -67,10 +43,63 @@
     (write-cmd connection cmd))
   (read-response in-stream ret-c (count cmds)))
 
+(gloss/defcodec resp-type
+  (gloss/enum :byte {:str \+ :err \- :int \: :bulk-str \$ :ary \*}))
+
+(gloss/defcodec resp-str
+  (gloss/string :utf-8 :delimiters ["\r\n"]))
+
+(gloss/defcodec resp-err
+  (gloss/string :utf-8 :delimiters ["\r\n"]))
+
+(gloss/defcodec resp-int
+  (gloss/string-integer :utf-8 :delimiters ["\r\n"]))
+
+(gloss/defcodec resp-bulk-str
+  (gloss/finite-frame
+   (gloss/prefix (gloss/string :utf-8 :delimiters ["\r\n"])
+                 (fn [len-str]
+                   (let [length (Long/parseLong len-str)]
+                     (if (< length 0)
+                       0
+                       (+ length 2))))
+                 str)
+   (gloss/string :utf-8 :suffix "\r\n")))
+
+(declare resp-frame)
+
+(gloss/defcodec resp-ary
+  (gloss/header
+   (gloss/string-integer :utf-8 :delimiters ["\r\n"])
+   (fn [ary-size]
+     (gloss/compile-frame
+      (if (= ary-size 0)
+        []
+        (repeat ary-size resp-frame))))
+   (fn [ary]
+     (count ary))))
+
+(def ^:private resp-frames
+  {:str      resp-str
+   :err      resp-err
+   :int      resp-int
+   :bulk-str resp-bulk-str
+   :ary      resp-ary})
+
+(gloss/defcodec resp-frame
+  (gloss/header
+   resp-type
+   resp-frames
+   nil))
+
 (defn open-connection [redis]
   (let [redis      (merge default-redis redis)
         connection @(tcp/client redis)
-        in-stream  (io/decode-stream connection resp-frame)
+        in-stream  (io/decode-stream (stream/map (fn [c]
+                                                   (println "CHUNK:" c)
+                                                   c)
+                                                 connection)
+                                     resp-frame)
         cmd-ch     (a/chan)]
     (a/thread
       (loop [cmd (a/<!! cmd-ch)]
