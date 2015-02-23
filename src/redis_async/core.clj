@@ -95,11 +95,7 @@
 (defn open-connection [redis]
   (let [redis      (merge default-redis redis)
         connection @(tcp/client redis)
-        in-stream  (io/decode-stream (stream/map (fn [c]
-                                                   (println "CHUNK:" c)
-                                                   c)
-                                                 connection)
-                                     resp-frame)
+        in-stream  (io/decode-stream resp-frame)
         cmd-ch     (a/chan)]
     (a/thread
       (loop [cmd (a/<!! cmd-ch)]
