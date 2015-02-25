@@ -5,7 +5,6 @@ Development for an asynchronous Redis client for Clojure.  Currently under devel
 ### Still to-do
 
 1. Complete implementation of all commands.
-2. Safer implementation of `parse-response-lines` to not get confused by extra carriage returns.
+2. Use core async channels when writing.
 3. Documentation.
-4. Don't specify connection each time if using pipelining.
-5. Scripting support.
+4. Scripting support.
