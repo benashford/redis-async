@@ -1,6 +1,5 @@
 (ns redis-async.core
   (:require [aleph.tcp :as tcp]
-            [byte-streams :refer [convert]]
             [clojure.core.async :as a]
             [clojure.string :as s]
             [manifold.deferred :as d]
@@ -23,25 +22,7 @@
         bytes (io/encode-all resp-frame-out cmd-lines)]
     (stream/put! connection (io/contiguous bytes))))
 
-(defn- parse-responses [lines num-responses]
-  (take num-responses lines))
-
-(defn- read-response
-  "Read from a connection, then write to ret-c"
-  [in-stream ret-c num-responses]
-  (let [stream-seq (stream/stream->seq in-stream)
-        responses  (parse-responses stream-seq num-responses)]
-    (a/put! ret-c (if (> (count responses) 1)
-                    responses
-                    (if-let [r (first responses)]
-                      r
-                      [nil]))))
-  (a/close! ret-c))
-
-(defn- do-cmd [connection in-stream {:keys [ret-c cmds]}]
-  (doseq [cmd cmds]
-    (write-cmd connection cmd))
-  (read-response in-stream ret-c (count cmds)))
+;; Reading
 
 (gloss/defcodec resp-type
   (gloss/enum :byte {:str \+ :err \- :int \: :bulk-str \$ :ary \*}))
@@ -92,21 +73,34 @@
    resp-frames
    nil))
 
+(defn- parse-responses [lines num-responses]
+  (take num-responses lines))
+
 (defn open-connection [redis]
   (let [redis      (merge default-redis redis)
         connection @(tcp/client redis)
-        in-stream  (io/decode-stream resp-frame)
+        in-stream  (io/decode-stream connection resp-frame)
+        in-c       (a/chan)
         cmd-ch     (a/chan)]
-    (a/thread
-      (loop [cmd (a/<!! cmd-ch)]
-        (if-not cmd
-          nil
-          (do
-            (do-cmd connection in-stream cmd)
-            (recur (a/<!! cmd-ch))))))
+    (stream/connect in-stream in-c)
+    (a/go
+      (loop [cmd (a/<! cmd-ch)]
+        (when cmd
+          (let [{:keys [ret-c cmds]} cmd]
+            (doseq [cmd cmds]
+              (write-cmd connection cmd))
+            (dotimes [_ (count cmds)]
+              (let [r (a/<! in-c)]
+                (a/>! ret-c (if r r :nil))))
+            (a/close! ret-c))
+          (recur (a/<! cmd-ch))))
+      (stream/close! connection))
     (assoc redis
       :command-channel cmd-ch
       ::connection connection)))
+
+(defn close-connection [redis]
+  (a/close! (:command-channel redis)))
 
 (def ^:dynamic *pipe* nil)
 (def ^:dynamic *redis* nil)
