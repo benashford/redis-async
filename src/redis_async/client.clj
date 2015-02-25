@@ -9,8 +9,8 @@
                   (s/split x #"-")
                   (mapv s/upper-case x))]
     `(defn ~fn-n [& ~'params]
-       (let [redis#  (or *redis* (first ~'params))
-             params# (if *redis* ~'params (drop 1 ~'params))]
+       (let [redis#  (when-not *pipe* (first ~'params))
+             params# (if *pipe* ~'params (drop 1 ~'params))]
          (apply send-cmd redis# ~cmd params#)))))
 
 ;; Commands

@@ -20,7 +20,8 @@
                                   [(str "$" (count p)) p])
                                 cmd))
         bytes (io/encode-all resp-frame-out cmd-lines)]
-    (stream/put! connection (io/contiguous bytes))))
+    (stream/put! connection (io/contiguous bytes))
+    true))
 
 ;; Reading
 
@@ -76,6 +77,8 @@
 (defn- parse-responses [lines num-responses]
   (take num-responses lines))
 
+(def pipelined-buffer-size 1000)
+
 (defn open-connection [redis]
   (let [redis      (merge default-redis redis)
         connection @(tcp/client redis)
@@ -86,12 +89,15 @@
     (a/go
       (loop [cmd (a/<! cmd-ch)]
         (when cmd
-          (let [{:keys [ret-c cmds]} cmd]
-            (doseq [cmd cmds]
-              (write-cmd connection cmd))
-            (dotimes [_ (count cmds)]
-              (let [r (a/<! in-c)]
-                (a/>! ret-c (if r r :nil))))
+          (let [{:keys [ret-c cmds]} cmd
+                written-c            (a/map #(write-cmd connection %)
+                                            [cmds]
+                                            pipelined-buffer-size)]
+            (loop [w (a/<! written-c)]
+              (when w
+                (let [r (a/<! in-c)]
+                  (a/>! ret-c (if r r :nil)))
+                (recur (a/<! written-c))))
             (a/close! ret-c))
           (recur (a/<! cmd-ch))))
       (stream/close! connection))
@@ -103,7 +109,6 @@
   (a/close! (:command-channel redis)))
 
 (def ^:dynamic *pipe* nil)
-(def ^:dynamic *redis* nil)
 
 (defn- coerce-to-string [param]
   (cond
@@ -115,10 +120,13 @@
   (let [cmd-ch   (:command-channel redis)
         full-cmd (concat command (map coerce-to-string params))]
     (if *pipe*
-      (swap! *pipe* conj full-cmd)
-      (let [ch (a/chan)]
+      (a/put! *pipe* full-cmd)
+      (let [ch   (a/chan)
+            cmds (a/chan)]
         (a/put! cmd-ch {:ret-c ch
-                        :cmds  [full-cmd]})
+                        :cmds  cmds})
+        (a/put! cmds full-cmd)
+        (a/close! cmds)
         ch))))
 
 (defn flush-pipe [redis]
@@ -129,7 +137,10 @@
     ch))
 
 (defmacro pipelined [redis & body]
-  `(binding [*pipe*  (atom [])
-             *redis* ~redis]
-     ~@body
-     (flush-pipe ~redis)))
+  `(binding [*pipe* (a/chan pipelined-buffer-size)]
+     (let [ch# (a/chan pipelined-buffer-size)]
+       (a/put! (:command-channel ~redis) {:ret-c ch#
+                                          :cmds  *pipe*})
+       ~@body
+       (a/close! *pipe*)
+       ch#)))
