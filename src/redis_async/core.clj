@@ -130,6 +130,6 @@
 
 (defmacro pipelined [redis & body]
   `(binding [*pipe*  (atom [])
-             *redis* redis]
+             *redis* ~redis]
      ~@body
      (flush-pipe ~redis)))

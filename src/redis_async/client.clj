@@ -1,5 +1,5 @@
 (ns redis-async.client
-  (:refer-clojure :excludes [time sync keys])
+  (:refer-clojure :exclude [time sync keys])
   (:require [clojure.string :as s]
             [redis-async.core :refer :all]))
 
@@ -8,8 +8,10 @@
                   (name x)
                   (s/split x #"-")
                   (mapv s/upper-case x))]
-    `(defn ~fn-n [~'redis & ~'params]
-       (apply send-cmd ~'redis ~cmd ~'params))))
+    `(defn ~fn-n [& ~'params]
+       (let [redis#  (or *redis* (first ~'params))
+             params# (if *redis* ~'params (drop 1 ~'params))]
+         (apply send-cmd redis# ~cmd params#)))))
 
 ;; Commands
 
