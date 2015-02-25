@@ -1,5 +1,5 @@
 (ns redis-async.client
-  (:refer-clojure :exclude [time sync keys])
+  (:refer-clojure :exclude [time sync keys sort type])
   (:require [clojure.string :as s]
             [redis-async.core :refer :all]))
 
@@ -15,54 +15,61 @@
 
 ;; Commands
 
-(def keys ['del
-           'dump
-           'exists
-           'expire
-           'expireat
-           'keys
-           'migrate
-           'move
-           'object
-           'persist
-           'pexpire
-           'pexpireat
-           'pttl
-           'randomkey])
-(def connection ['auth 'echo 'ping 'quit 'select])
-(def server ['bgrewriteaof
-             'bgsave
-             'client-kill
-             'client-list
-             'client-getname
-             'client-pause
-             'client-setname
-             'cluster-slots
-             'command
-             'command-count
-             'command-getkeys
-             'command-info
-             'config-get
-             'config-rewrite
-             'config-set
-             'config-resetstat
-             'dbsize
-             'debug-object
-             'debug-segfault
-             'flushall
-             'flushdb
-             'info
-             'lastsave
-             ;'monitor
-             'role
-             'save
-             'shutdown
-             'slaveof
-             'slowlog
-             'sync
-             'time
-             ])
+(def commands
+  {:keys ['del
+          'dump
+          'exists
+          'expire
+          'expireat
+          'keys
+          'migrate
+          'move
+          'object
+          'persist
+          'pexpire
+          'pexpireat
+          'pttl
+          'randomkey
+          'rename
+          'renamenx
+          'restore
+          'sort
+          'ttl
+          'type
+          'scan
+          ]
+   :connection ['auth 'echo 'ping 'quit 'select]
+   :server ['bgrewriteaof
+            'bgsave
+            'client-kill
+            'client-list
+            'client-getname
+            'client-pause
+            'client-setname
+            'cluster-slots
+            'command
+            'command-count
+            'command-getkeys
+            'command-info
+            'config-get
+            'config-rewrite
+            'config-set
+            'config-resetstat
+            'dbsize
+            'debug-object
+            'debug-segfault
+            'flushall
+            'flushdb
+            'info
+            'lastsave
+                                        ;'monitor
+            'role
+            'save
+            'shutdown
+            'slaveof
+            'slowlog
+            'sync
+            'time]})
 
-(doseq [range [keys connection server]
-        cmd   range]
+(doseq [cmd (flatten (clojure.core/vals commands))]
   (eval `(defredis ~cmd)))
