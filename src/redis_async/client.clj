@@ -1,5 +1,5 @@
 (ns redis-async.client
-  (:refer-clojure :exclude [time sync keys sort type])
+  (:refer-clojure :exclude [time sync keys sort type get set])
   (:require [clojure.string :as s]
             [redis-async.core :refer :all]))
 
@@ -36,8 +36,30 @@
           'sort
           'ttl
           'type
-          'scan
-          ]
+          'scan]
+   :strings ['append
+             'bitcount
+             'bitop
+             'bitpos
+             'decr
+             'decrby
+             'get
+             'getbit
+             'getrange
+             'getset
+             'incr
+             'incrby
+             'incrbyfloat
+             'mget
+             'mset
+             'msetnx
+             'psetex
+             'set
+             'setbit
+             'setex
+             'setnx
+             'setrange
+             'strlen]
    :connection ['auth 'echo 'ping 'quit 'select]
    :server ['bgrewriteaof
             'bgsave
