@@ -91,6 +91,21 @@
            'rpoplpush
            'rpush
            'rpushx]
+   :sets ['sadd
+          'scard
+          'sdiff
+          'sdiffstore
+          'sinter
+          'sinterstore
+          'sismember
+          'smembers
+          'smove
+          'spop
+          'srandmember
+          'srem
+          'sunion
+          'sunionstore
+          'sscan]
    :connection ['auth 'echo 'ping 'quit 'select]
    :server ['bgrewriteaof
             'bgsave
