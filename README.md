@@ -10,3 +10,4 @@ Development for an asynchronous Redis client for Clojure.  Currently under devel
 4. Scripting support.
 5. Handling errors from Redis
 6. The 'monitor' command
+7. Test coverage

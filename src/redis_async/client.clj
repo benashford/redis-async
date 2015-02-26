@@ -74,6 +74,23 @@
             'hsetnx
             'hvals
             'hscan]
+   :lists ['blpop
+           'brpop
+           'brpoplpush
+           'lindex
+           'linsert
+           'llen
+           'lpop
+           'lpush
+           'lpushx
+           'lrange
+           'lrem
+           'lset
+           'ltrim
+           'rpop
+           'rpoplpush
+           'rpush
+           'rpushx]
    :connection ['auth 'echo 'ping 'quit 'select]
    :server ['bgrewriteaof
             'bgsave
