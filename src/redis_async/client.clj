@@ -60,6 +60,20 @@
              'setnx
              'setrange
              'strlen]
+   :hashes ['hdel
+            'hexists
+            'hget
+            'hgetall
+            'hincrby
+            'hincrbyfloat
+            'hkeys
+            'hlen
+            'hmget
+            'hmset
+            'hset
+            'hsetnx
+            'hvals
+            'hscan]
    :connection ['auth 'echo 'ping 'quit 'select]
    :server ['bgrewriteaof
             'bgsave
