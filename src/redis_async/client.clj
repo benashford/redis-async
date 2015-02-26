@@ -106,6 +106,27 @@
           'sunion
           'sunionstore
           'sscan]
+   :sorted-sets ['zadd
+                 'zcard
+                 'zcount
+                 'zincrby
+                 'zinterstore
+                 'zlexcount
+                 'zrange
+                 'zrangebylex
+                 'zrevrangebylex
+                 'zrangebyscore
+                 'zrank
+                 'zrem
+                 'zremrangebylex
+                 'zremrangebyrank
+                 'zremrangebyscore
+                 'zrevrange
+                 'zrevrangebyscore
+                 'zrevrank
+                 'zscore
+                 'zunionstore
+                 'zscan]
    :connection ['auth 'echo 'ping 'quit 'select]
    :server ['bgrewriteaof
             'bgsave
