@@ -1,5 +1,5 @@
 (ns redis-async.client
-  (:refer-clojure :exclude [time sync keys sort type get set])
+  (:refer-clojure :exclude [time sync keys sort type get set eval])
   (:require [clojure.string :as s]
             [redis-async.core :refer :all]))
 
@@ -127,6 +127,15 @@
                  'zscore
                  'zunionstore
                  'zscan]
+   :hyper-log-log ['pfadd
+                   'pfcount
+                   'pfmerge]
+   :scripting ['eval
+               'evalsha
+               'script-exists
+               'script-flush
+               'script-kill
+               'script-load]
    :connection ['auth 'echo 'ping 'quit 'select]
    :server ['bgrewriteaof
             'bgsave
@@ -161,4 +170,4 @@
             'time]})
 
 (doseq [cmd (flatten (clojure.core/vals commands))]
-  (eval `(defredis ~cmd)))
+  (clojure.core/eval `(defredis ~cmd)))
