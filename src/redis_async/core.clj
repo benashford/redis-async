@@ -4,85 +4,28 @@
             [clojure.string :as s]
             [manifold.deferred :as d]
             [manifold.stream :as stream]
-            [gloss.core :as gloss]
-            [gloss.io :as io]))
+            [gloss.io :as io]
+            [redis-async.protocol :as protocol]))
 
 (def ^:private default-redis
   {:host "localhost"
    :port 6379})
-
-;; unify with real-frame
-(def ^:private resp-frame-out (gloss/string :utf-8 :delimiters ["\r\n"]))
 
 (defn- write-cmd [connection cmd]
   (let [cmd-lines (cons (str "*" (count cmd))
                         (mapcat (fn [p]
                                   [(str "$" (count p)) p])
                                 cmd))
-        bytes (io/encode-all resp-frame-out cmd-lines)]
+        bytes (io/encode-all protocol/resp-frame-out cmd-lines)]
     (stream/put! connection (io/contiguous bytes))
     true))
-
-;; Reading
-
-(gloss/defcodec resp-type
-  (gloss/enum :byte {:str \+ :err \- :int \: :bulk-str \$ :ary \*}))
-
-(gloss/defcodec resp-str
-  (gloss/string :utf-8 :delimiters ["\r\n"]))
-
-(gloss/defcodec resp-err
-  (gloss/string :utf-8 :delimiters ["\r\n"]))
-
-(gloss/defcodec resp-int
-  (gloss/string-integer :utf-8 :delimiters ["\r\n"]))
-
-(gloss/defcodec resp-bulk-str
-  (gloss/finite-frame
-   (gloss/prefix (gloss/string :utf-8 :delimiters ["\r\n"])
-                 (fn [len-str]
-                   (let [length (Long/parseLong len-str)]
-                     (if (< length 0)
-                       0
-                       (+ length 2))))
-                 str)
-   (gloss/string :utf-8 :suffix "\r\n")))
-
-(declare resp-frame)
-
-(gloss/defcodec resp-ary
-  (gloss/header
-   (gloss/string-integer :utf-8 :delimiters ["\r\n"])
-   (fn [ary-size]
-     (gloss/compile-frame
-      (if (= ary-size 0)
-        []
-        (repeat ary-size resp-frame))))
-   (fn [ary]
-     (count ary))))
-
-(def ^:private resp-frames
-  {:str      resp-str
-   :err      resp-err
-   :int      resp-int
-   :bulk-str resp-bulk-str
-   :ary      resp-ary})
-
-(gloss/defcodec resp-frame
-  (gloss/header
-   resp-type
-   resp-frames
-   nil))
-
-(defn- parse-responses [lines num-responses]
-  (take num-responses lines))
 
 (def pipelined-buffer-size 1000)
 
 (defn open-connection [redis]
   (let [redis      (merge default-redis redis)
         connection @(tcp/client redis)
-        in-stream  (io/decode-stream connection resp-frame)
+        in-stream  (io/decode-stream connection protocol/resp-frame)
         in-c       (a/chan)
         cmd-ch     (a/chan)]
     (stream/connect in-stream in-c)
@@ -117,12 +60,12 @@
    :else (str param)))
 
 (defn send-cmd [redis command & params]
-  (let [cmd-ch   (:command-channel redis)
-        full-cmd (concat command (map coerce-to-string params))]
+  (let [full-cmd (concat command (map coerce-to-string params))]
     (if *pipe*
       (a/put! *pipe* full-cmd)
-      (let [ch   (a/chan)
-            cmds (a/chan)]
+      (let [cmd-ch (:command-channel redis)
+            ch     (a/chan)
+            cmds   (a/chan)]
         (a/put! cmd-ch {:ret-c ch
                         :cmds  cmds})
         (a/put! cmds full-cmd)
