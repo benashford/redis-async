@@ -57,11 +57,6 @@
                     (test-con [this con] true)
                     (new-con [this] (open-connection redis)))))
 
-(defn get-connection
-  "Returns a connection in the form of a command channel"
-  [p]
-  (pool/get-connection p))
-
 (def ^:dynamic *pipe* nil)
 
 (defn- coerce-to-string [param]
@@ -70,28 +65,24 @@
    (keyword? param) (name param)
    :else (str param)))
 
-(defn send-cmd [cmd-ch command & params]
+(defn send-cmd [pool command & params]
   (let [full-cmd (concat command (map coerce-to-string params))]
     (if *pipe*
       (a/put! *pipe* full-cmd)
-      (let [ret-c (a/chan)
-            cmds  (a/chan)]
+      (let [cmd-ch (pool/get-connection pool)
+            ret-c  (a/chan)
+            cmds   (a/chan)]
         (a/put! cmd-ch {:ret-c ret-c
                         :cmds  cmds})
         (a/put! cmds full-cmd)
         (a/close! cmds)
         ret-c))))
 
-(defn flush-pipe [cmd-ch]
-  (let [ch (a/chan)]
-    (a/put! cmd-ch {:ret-c ch
-                    :cmds  @*pipe*})
-    ch))
-
-(defmacro pipelined [cmd-ch & body]
+(defmacro pipelined [pool & body]
   `(binding [*pipe* (a/chan pipelined-buffer-size)]
-     (let [ch# (a/chan pipelined-buffer-size)]
-       (a/put! ~cmd-ch {:ret-c ch#
+     (let [cmd-ch# (pool/get-connection ~pool)
+           ch#     (a/chan pipelined-buffer-size)]
+       (a/put! cmd-ch# {:ret-c ch#
                         :cmds  *pipe*})
        ~@body
        (a/close! *pipe*)
