@@ -15,3 +15,5 @@ Development for an asynchronous Redis client for Clojure.  Currently under devel
 9. Test coverage
 10. Multiple-connections per client.
 11. Testing/handling bad/failed connections.
+12. Ensure that no-nil values get written to the core.async channel
+13. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)

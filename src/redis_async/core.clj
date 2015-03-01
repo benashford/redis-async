@@ -2,9 +2,9 @@
   (:require [aleph.tcp :as tcp]
             [clojure.core.async :as a]
             [clojure.string :as s]
-            [manifold.deferred :as d]
             [manifold.stream :as stream]
             [gloss.io :as io]
+            [redis-async.pool :as pool]
             [redis-async.protocol :as protocol]))
 
 (def ^:private default-redis
@@ -22,7 +22,11 @@
 
 (def pipelined-buffer-size 1000)
 
-(defn open-connection [redis]
+(defn- open-connection
+  "Given a map containing connection details to a redis instance, returns a
+   channel through which requests can be made.  Closing the channel will
+   shutdown"
+  [redis]
   (let [redis      (merge default-redis redis)
         connection @(tcp/client redis)
         in-stream  (io/decode-stream connection protocol/resp-frame)
@@ -44,12 +48,19 @@
             (a/close! ret-c))
           (recur (a/<! cmd-ch))))
       (stream/close! connection))
-    (assoc redis
-      :command-channel cmd-ch
-      ::connection connection)))
+    cmd-ch))
 
-(defn close-connection [redis]
-  (a/close! (:command-channel redis)))
+(defn make-pool
+  "Make a connection pool to a specific redis thing"
+  [redis]
+  (pool/make-pool (reify pool/ConnectionFactory
+                    (test-con [this con] true)
+                    (new-con [this] (open-connection redis)))))
+
+(defn get-connection
+  "Returns a connection in the form of a command channel"
+  [p]
+  (pool/get-connection p))
 
 (def ^:dynamic *pipe* nil)
 
@@ -59,31 +70,29 @@
    (keyword? param) (name param)
    :else (str param)))
 
-(defn send-cmd [redis command & params]
+(defn send-cmd [cmd-ch command & params]
   (let [full-cmd (concat command (map coerce-to-string params))]
     (if *pipe*
       (a/put! *pipe* full-cmd)
-      (let [cmd-ch (:command-channel redis)
-            ch     (a/chan)
-            cmds   (a/chan)]
-        (a/put! cmd-ch {:ret-c ch
+      (let [ret-c (a/chan)
+            cmds  (a/chan)]
+        (a/put! cmd-ch {:ret-c ret-c
                         :cmds  cmds})
         (a/put! cmds full-cmd)
         (a/close! cmds)
-        ch))))
+        ret-c))))
 
-(defn flush-pipe [redis]
-  (let [cmd-ch (:command-channel redis)
-        ch     (a/chan)]
+(defn flush-pipe [cmd-ch]
+  (let [ch (a/chan)]
     (a/put! cmd-ch {:ret-c ch
                     :cmds  @*pipe*})
     ch))
 
-(defmacro pipelined [redis & body]
+(defmacro pipelined [cmd-ch & body]
   `(binding [*pipe* (a/chan pipelined-buffer-size)]
      (let [ch# (a/chan pipelined-buffer-size)]
-       (a/put! (:command-channel ~redis) {:ret-c ch#
-                                          :cmds  *pipe*})
+       (a/put! ~cmd-ch {:ret-c ch#
+                        :cmds  *pipe*})
        ~@body
        (a/close! *pipe*)
        ch#)))
