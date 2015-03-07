@@ -15,7 +15,7 @@ There are two primary design goals.  First, to be async, using `core.async`, to 
 
 ;; Build a connection pool
 
-(def p (make-pool {:hostname "localhost" :port 6439}))
+(def p (make-pool {:hostname "localhost" :port 6379}))
 
 ;; Set a value
 
