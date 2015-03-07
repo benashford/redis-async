@@ -44,13 +44,24 @@ Example of pipelining:
 (<!! ch) ;; "TEST2"
 ```
 
+#### Client functions
+
 Each function that implements a Redis command returns a channel, from which the result of that command can be read.  These can be read like any other `core.async` channel, or one of the convenience functions/macros can be used instead; the main difference between the convenience options and anything else is that they ensure conventions are in place (e.g. it allows a Redis operation to return nil, usually you cannot send nil through a `core.async` channel).
 
 *IMPORTANT* Each channel should be fully consumed, otherwise a connection may become stuck.
 
+#### Other client functions
+
+The convenience functions for dealing with channels follow the same naming convention as `core.async` namely using a single `!` for those which work in a `go` block, and a double `!!` for those outside of a `go` block.
+
+`<!` and `<!!` simply read a value from a channel, but will substitute nils correctly, this means that you cannot use nil to understand when the end of the channel has been reached, you need to know how many values to expect, which is trivial in most circumstances.
+
+`wait!` and `wait!!` throw away the value, but can be used to ensure that the action has happened before proceeding.
+
+`faf` is "fire-and-forget", just move on.  This will ensure the channel is fully consumed, but doesn't wait.
+
 ## Still to-do
 
-1. Utility readers for idiomatic reading.
 2. Use core async channels when writing.
 3. Documentation.
 4. Scripting support.
