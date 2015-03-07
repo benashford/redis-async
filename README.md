@@ -46,6 +46,8 @@ Example of pipelining:
 
 Each function that implements a Redis command returns a channel, from which the result of that command can be read.  These can be read like any other `core.async` channel, or one of the convenience functions/macros can be used instead; the main difference between the convenience options and anything else is that they ensure conventions are in place (e.g. it allows a Redis operation to return nil, usually you cannot send nil through a `core.async` channel).
 
+*IMPORTANT* Each channel should be fully consumed, otherwise a connection may become stuck.
+
 ## Still to-do
 
 1. Utility readers for idiomatic reading.
