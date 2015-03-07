@@ -62,5 +62,6 @@ Each function that implements a Redis command returns a channel, from which the 
 10. Multiple-connections per client.
 11. Testing/handling bad/failed connections.
 12. Ensure efficient pipelining (at present it's sending each command one-by-one anyway)
+13. Ensure efficient buffering of channels.
 13. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
 1. Auto-generate client functions from commands.json
