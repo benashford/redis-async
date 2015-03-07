@@ -8,7 +8,7 @@ There are two primary design goals.  First, to be async, using `core.async`, to 
 
 ## How to use
 
-### Simple example
+### Simple interactive example
 
 ```clojure
 (require '[redis-async.client :refer :all])
