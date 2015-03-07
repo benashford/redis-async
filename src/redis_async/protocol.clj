@@ -27,7 +27,9 @@
   (string :utf-8 :delimiters ["\r\n"]))
 
 (defcodec resp-err
-  (string :utf-8 :delimiters ["\r\n"]))
+  (compile-frame (string :utf-8 :delimiters ["\r\n"])
+                 (fn [err] (:error err))
+                 (fn [str] {:error str})))
 
 (defcodec resp-int
   (string-integer :utf-8 :delimiters ["\r\n"]))
@@ -42,7 +44,9 @@
                       (fn [_] :nil))
        (string :utf-8 :length str-size :suffix "\r\n")))
    (fn [str]
-     (count str))))
+     (if (keyword? str)
+       -1
+       (count str)))))
 
 (declare resp-frame)
 
@@ -53,7 +57,9 @@
      (compile-frame
       (if (= ary-size 0)
         []
-        (repeat ary-size resp-frame))))
+        (repeat ary-size resp-frame))
+      (fn [ary] (mapv #(if (nil? %) :nil %) ary))
+      (fn [ary] (mapv #(if (= % :nil) nil %) ary))))
    (fn [ary]
      (count ary))))
 
@@ -67,4 +73,13 @@
 (defcodec resp-frame
   (header resp-type
           resp-frames
-          nil))
+          (fn [data]
+            (cond
+             (or (vector? data) (seq? data))
+             :ary
+
+             (or (keyword? data) (string? data))
+             :bulk-str
+
+             (integer? data)
+             :int))))
