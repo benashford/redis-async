@@ -1,5 +1,7 @@
 # redis-async
 
+[![Build Status](https://travis-ci.org/benashford/redis-async.svg)](https://travis-ci.org/benashford/redis-async)
+
 Development for an asynchronous Redis client for Clojure.  Currently under development, not yet ready for use.
 
 ## Design goals
