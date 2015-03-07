@@ -1,6 +1,7 @@
 (ns redis-async.client
   (:refer-clojure :exclude [time sync keys sort type get set eval])
   (:require [clojure.string :as s]
+            [clojure.core.async :as a]
             [redis-async.core :refer :all]))
 
 (defmacro defredis [fn-n]
@@ -12,6 +13,34 @@
        (let [redis#  (when-not *pipe* (first ~'params))
              params# (if *pipe* ~'params (drop 1 ~'params))]
          (apply send-cmd redis# ~cmd params#)))))
+
+;; Useful to enforce conventions
+
+(defn sub-nils [val]
+  (if (= val :nil)
+    nil
+    val))
+
+(defmacro <! [expr]
+  `(sub-nils (a/<! ~expr)))
+
+(defmacro <!! [expr]
+  `(sub-nils (a/<!! ~expr)))
+
+(defn faf
+  "Fire-and-forget"
+  [ch]
+  (a/go-loop [v (a/<! ch)]
+    (when v
+      (recur (a/<! ch)))))
+
+(defmacro wait! [expr]
+  `(do (a/<! (faf ~expr))
+       nil))
+
+(defmacro wait!! [expr]
+  `(do (a/<!! (faf ~expr))
+       nil))
 
 ;; Commands
 
