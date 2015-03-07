@@ -15,11 +15,6 @@
 (ns redis-async.protocol
   (:require [gloss.core :refer :all]))
 
-;; unify with real-frame
-(def resp-frame-out (string :utf-8 :delimiters ["\r\n"]))
-
-;; Reading
-
 (defcodec resp-type
   (enum :byte {:str \+ :err \- :int \: :bulk-str \$ :ary \*}))
 

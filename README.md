@@ -65,6 +65,7 @@ The convenience functions for dealing with channels follow the same naming conve
 ## Still to-do
 
 2. Use core async channels when writing.
+3. Ensure backpressure is handled correctly.
 3. Documentation.
 4. Scripting support.
 5. Handling errors from Redis.
@@ -78,6 +79,7 @@ The convenience functions for dealing with channels follow the same naming conve
 13. Ensure efficient buffering of channels.
 13. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
 1. Auto-generate client functions from commands.json
+2. Create Clojure 1.7 version using transducers
 
 ## License
 

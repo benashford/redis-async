@@ -25,15 +25,6 @@
   {:host "localhost"
    :port 6379})
 
-(defn- write-cmd [connection cmd]
-  (let [cmd-lines (cons (str "*" (count cmd))
-                        (mapcat (fn [p]
-                                  [(str "$" (count p)) p])
-                                cmd))
-        bytes (io/encode-all protocol/resp-frame-out cmd-lines)]
-    (stream/put! connection (io/contiguous bytes))
-    true))
-
 (def pipelined-buffer-size 1000)
 
 (defn- open-connection
@@ -47,21 +38,29 @@
         in-c       (a/chan)
         cmd-ch     (a/chan)]
     (stream/connect in-stream in-c)
-    (a/go
-      (loop [cmd (a/<! cmd-ch)]
-        (when cmd
+    (a/go-loop [cmd (a/<! cmd-ch)]
+      (if (nil? cmd)
+        (stream/close! connection)
+        (do
           (let [{:keys [ret-c cmds]} cmd
-                written-c            (a/map #(write-cmd connection %)
-                                            [cmds]
-                                            pipelined-buffer-size)]
+                written-c            (a/chan)]
+            (a/go-loop [c (a/<! cmds)]
+              (if (nil? c)
+                (a/close! written-c)
+                (do
+                  (a/put! written-c true)
+                  (->> c
+                       (io/encode protocol/resp-frame)
+                       io/contiguous
+                       (stream/put! connection))
+                  (recur (a/<! cmds)))))
             (loop [w (a/<! written-c)]
               (when w
                 (let [r (a/<! in-c)]
                   (a/>! ret-c (if r r :nil)))
                 (recur (a/<! written-c))))
             (a/close! ret-c))
-          (recur (a/<! cmd-ch))))
-      (stream/close! connection))
+          (recur (a/<! cmd-ch)))))
     cmd-ch))
 
 (defn make-pool
@@ -84,7 +83,7 @@
     (if *pipe*
       (a/put! *pipe* full-cmd)
       (let [cmd-ch (pool/get-connection pool)
-            ret-c  (a/chan)
+            ret-c  (a/chan 1)
             cmds   (a/chan)]
         (a/put! cmd-ch {:ret-c ret-c
                         :cmds  cmds})
@@ -93,7 +92,7 @@
         ret-c))))
 
 (defmacro pipelined [pool & body]
-  `(binding [*pipe* (a/chan pipelined-buffer-size)]
+  `(binding [*pipe* (a/chan)]
      (let [cmd-ch# (pool/get-connection ~pool)
            ch#     (a/chan pipelined-buffer-size)]
        (a/put! cmd-ch# {:ret-c ch#
