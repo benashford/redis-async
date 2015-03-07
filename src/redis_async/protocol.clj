@@ -19,15 +19,16 @@
   (string-integer :utf-8 :delimiters ["\r\n"]))
 
 (defcodec resp-bulk-str
-  (finite-frame
-   (prefix (string :utf-8 :delimiters ["\r\n"])
-           (fn [len-str]
-             (let [length (Long/parseLong len-str)]
-               (if (< length 0)
-                 0
-                 (+ length 2))))
-           str)
-   (string :utf-8 :suffix "\r\n")))
+  (header
+   (string-integer :utf-8 :delimiters ["\r\n"])
+   (fn [str-size]
+     (if (< str-size 0)
+       (compile-frame []
+                      (fn [_] [])
+                      (fn [_] :nil))
+       (string :utf-8 :length str-size :suffix "\r\n")))
+   (fn [str]
+     (count str))))
 
 (declare resp-frame)
 
