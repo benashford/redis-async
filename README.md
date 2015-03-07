@@ -64,22 +64,21 @@ The convenience functions for dealing with channels follow the same naming conve
 
 ## Still to-do
 
-2. Use core async channels when writing.
-3. Ensure backpressure is handled correctly.
+1. Handling errors from Redis.
+2. Ensure backpressure is handled correctly.
 3. Documentation.
 4. Scripting support.
-5. Handling errors from Redis.
-6. The 'monitor' command.
-7. Pub/sub commands.
-8. Transaction commands.
-9. Test coverage.
-10. Multiple-connections per client.
-11. Testing/handling bad/failed connections.
-12. Ensure efficient pipelining (at present it's sending each command one-by-one anyway)
-13. Ensure efficient buffering of channels.
-13. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
-1. Auto-generate client functions from commands.json
-2. Create Clojure 1.7 version using transducers
+5. The 'monitor' command.
+6. Pub/sub commands.
+7. Transaction commands.
+8. Test coverage.
+9. Testing/handling bad/failed connections.
+10. Ensure efficient pipelining (at present it's sending each command one-by-one anyway)
+11. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
+12. Auto-generate client functions from commands.json
+13. Create Clojure 1.7 version using transducers
+14. Benchmarking
+15. Publish to Clojars
 
 ## License
 
