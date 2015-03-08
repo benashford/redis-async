@@ -18,10 +18,12 @@
 
 (defprotocol ConnectionFactory
   (test-con [this con])
-  (new-con [this]))
+  (new-con [this])
+  (close-con [this con]))
 
 (defprotocol Pool
-  (get-connection [this]))
+  (get-connection [this])
+  (close-pool [this]))
 
 (defrecord ConnectionPool [connection-factory connections]
   Pool
@@ -42,7 +44,10 @@
           :else
           (do
             (alter connections #(remove #{con} %))
-            (recur))))))))
+            (recur)))))))
+  (close-pool [this]
+    (doseq [connection @connections]
+      (close-con connection-factory connection))))
 
 (defn make-pool [con-fac]
   (ConnectionPool. con-fac (ref [])))

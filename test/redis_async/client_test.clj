@@ -1,7 +1,10 @@
 (ns redis-async.client-test
   (:require [redis-async.client :as client]
+            [redis-async.core :as core]
             [clojure.test :refer :all]
             [clojure.core.async :as a]))
+
+;; Testing utilities
 
 (defn- make-test-channel [& data]
   (let [c (a/chan)]
@@ -55,3 +58,37 @@
                                                {:error "ERR B"}))
              (catch clojure.lang.ExceptionInfo e
                (ex-data e)))))))
+
+;; Testing commands
+
+(def ^:dynamic *redis-pool* nil)
+
+(defmacro is-ok [expr]
+  `(is (= "OK" ~expr)))
+
+(defn- load-seed-data
+  "A bare-bones set of data for testing, most tests load their own data in
+  addition to this set."
+  []
+  (client/wait!! (client/set *redis-pool* "TEST-STRING" "STRING-VALUE")))
+
+(defn- redis-connect [f]
+  (binding [*redis-pool* (core/make-pool {})]
+    (is-ok (client/<!! (client/select *redis-pool* 1)))
+    (is-ok (client/<!! (client/flushdb *redis-pool*)))
+    (load-seed-data)
+    (f)
+    (core/close-pool *redis-pool*)))
+
+(defn- with-redis [f & params]
+  (apply f *redis-pool* params))
+
+(use-fixtures :once redis-connect)
+
+(deftest keys-test
+  (testing "DEL"
+    (is-ok (client/<!! (with-redis client/set "TEST-KEY" "TEST-VALUE")))
+    (is (= 1 (client/<!! (with-redis client/del "TEST-KEY"))))
+    (is (= 0 (client/<!! (with-redis client/del "TEST-KEY-DOESNT-EXIST")))))
+  #_(testing "DUMP"
+      (is (= "" (client/<!! (with-redis client/dump "TEST-STRING"))))))

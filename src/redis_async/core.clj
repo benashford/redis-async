@@ -68,7 +68,11 @@
   [redis]
   (pool/make-pool (reify pool/ConnectionFactory
                     (test-con [this con] true)
-                    (new-con [this] (open-connection redis)))))
+                    (new-con [this] (open-connection redis))
+                    (close-con [this con] (a/close! con)))))
+
+(defn close-pool [pool]
+  (pool/close-pool pool))
 
 (def ^:dynamic *pipe* nil)
 
