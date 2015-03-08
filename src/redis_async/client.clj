@@ -55,7 +55,7 @@
   "Fire-and-forget.  Warning: if no error-callback is defined, all errors are
   ignored."
   ([ch]
-   (faf ch (fn [] nil)))
+   (faf ch (fn [_] nil)))
   ([ch error-callback]
    (a/go-loop [v (a/<! ch)]
      (when v
