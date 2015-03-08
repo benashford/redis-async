@@ -68,7 +68,6 @@ The convenience functions for dealing with channels follow the same naming conve
 
 ## Still to-do
 
-1. Handling errors from Redis.
 2. Ensure backpressure is handled correctly.
 3. Documentation.
 4. Redis authentication.
@@ -84,6 +83,7 @@ The convenience functions for dealing with channels follow the same naming conve
 13. Create Clojure 1.7 version using transducers
 14. Benchmarking
 15. Publish to Clojars
+16. Split pipelined commands into multiple packages when exceeding limits, and/or add a buffered channel of the right size.
 
 ## License
 

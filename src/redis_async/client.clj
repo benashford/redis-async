@@ -30,31 +30,52 @@
 
 ;; Useful to enforce conventions
 
-(defn sub-nils [val]
+(defn- sub-nils [val]
   (if (= val :nil)
     nil
     val))
 
+(defn- is-error? [msg]
+  (and (map? msg)
+       (:error msg)))
+
+(defn read-value [msg]
+  (if (is-error? msg)
+    (throw (ex-info "Error from Redis" {:type :redis
+                                        :msg  (:error msg)}))
+    (sub-nils msg)))
+
 (defmacro <! [expr]
-  `(sub-nils (a/<! ~expr)))
+  `(read-value (a/<! ~expr)))
 
 (defmacro <!! [expr]
-  `(sub-nils (a/<!! ~expr)))
+  `(read-value (a/<!! ~expr)))
 
 (defn faf
-  "Fire-and-forget"
-  [ch]
-  (a/go-loop [v (a/<! ch)]
-    (when v
-      (recur (a/<! ch)))))
+  "Fire-and-forget.  Warning: if no error-callback is defined, all errors are
+  ignored."
+  ([ch]
+   (faf ch (fn [] nil)))
+  ([ch error-callback]
+   (a/go-loop [v (a/<! ch)]
+     (when v
+       (if (is-error? v)
+         (error-callback v))
+       (recur (a/<! ch))))))
+
+(defn check-wait-for-errors [results]
+  (let [errs (->> results
+                  (filter #(is-error? %))
+                  (map :error))]
+    (when-not (empty? errs)
+      (throw (ex-info "Error(s) from Redis" {:type :redis
+                                             :msgs errs})))))
 
 (defmacro wait! [expr]
-  `(do (a/<! (faf ~expr))
-       nil))
+  `(check-wait-for-errors (a/<! (a/into [] ~expr))))
 
 (defmacro wait!! [expr]
-  `(do (a/<!! (faf ~expr))
-       nil))
+  `(check-wait-for-errors (a/<!! (a/into [] ~expr))))
 
 ;; Commands
 
