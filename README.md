@@ -4,6 +4,10 @@
 
 Development for an asynchronous Redis client for Clojure.  Currently under development, not yet ready for use.
 
+## Availability
+
+Will be available via Clojars when it reaches the appropriate levels of completeness and stability.
+
 ## Design goals
 
 There are two primary design goals.  First, to be async, using `core.async`, to be easily used in an application already heavily based around that.  Second, to be as close to the Redis API as much as possible; it is a low-level API, but a very useful one.
@@ -67,6 +71,7 @@ The convenience functions for dealing with channels follow the same naming conve
 1. Handling errors from Redis.
 2. Ensure backpressure is handled correctly.
 3. Documentation.
+4. Redis authentication.
 4. Scripting support.
 5. The 'monitor' command.
 6. Pub/sub commands.
