@@ -68,6 +68,7 @@ The convenience functions for dealing with channels follow the same naming conve
 
 ## Still to-do
 
+1. Auto-generate client functions from commands.json
 1. Binary strings - e.g. "DUMP" command.  (Consider making byte-arrays the default, or change the default on a per-command basis - e.g. DUMP and RESTORE should be binary, everything else implicitely converted to strings.)
 1. Test coverage.
 2. The 'monitor' command.
@@ -81,7 +82,6 @@ The convenience functions for dealing with channels follow the same naming conve
 10. Testing/handling bad/failed connections.
 11. Ensure efficient pipelining (at present it's sending each command one-by-one anyway)
 12. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
-13. Auto-generate client functions from commands.json
 14. Create Clojure 1.7 version using transducers
 15. Benchmarking
 16. Split pipelined commands into multiple packages when exceeding limits, and/or add a buffered channel of the right size.
