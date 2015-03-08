@@ -68,6 +68,7 @@ The convenience functions for dealing with channels follow the same naming conve
 
 ## Still to-do
 
+1. Binary strings - e.g. "DUMP" command.
 1. Test coverage.
 2. The 'monitor' command.
 3. Pub/sub commands.
