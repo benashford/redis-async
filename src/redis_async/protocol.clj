@@ -15,6 +15,12 @@
 (ns redis-async.protocol
   (:require [gloss.core :refer :all]))
 
+(defn- seq->str [byte-v]
+  (String. (byte-array byte-v)))
+
+(defn- str->seq [^String in-str]
+  (into [] (.getBytes in-str)))
+
 (defcodec resp-type
   (enum :byte {:str \+ :err \- :int \: :bulk-str \$ :ary \*}))
 
@@ -22,9 +28,9 @@
   (string :utf-8 :delimiters ["\r\n"]))
 
 (defcodec resp-err
-  (compile-frame (string :utf-8 :delimiters ["\r\n"])
-                 (fn [err] (:error err))
-                 (fn [str] {:error str})))
+  (compile-frame (repeated :byte :delimiters ["\r\n"])
+                 (fn [err] (:error (str->seq err)))
+                 (fn [str] {:error (seq->str str)})))
 
 (defcodec resp-int
   (string-integer :utf-8 :delimiters ["\r\n"]))
@@ -37,7 +43,11 @@
        (compile-frame []
                       (fn [_] [])
                       (fn [_] :nil))
-       (string :utf-8 :length str-size :suffix "\r\n")))
+       (compile-frame (repeat (+ str-size 2) :byte)
+                      (fn [in-str]
+                        (str->seq (str in-str "\r\n")))
+                      (fn [bytes]
+                        (seq->str (subvec bytes 0 (- (count bytes) 2)))))))
    (fn [str]
      (if (keyword? str)
        -1
