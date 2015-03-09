@@ -57,7 +57,9 @@
             (loop [w (a/<! written-c)]
               (when w
                 (let [r (a/<! in-c)]
-                  (a/>! ret-c (if r r :nil)))
+                  (if r
+                    (a/>! ret-c r)
+                    (assert r "No result")))
                 (recur (a/<! written-c))))
             (a/close! ret-c))
           (recur (a/<! cmd-ch)))))
@@ -76,14 +78,8 @@
 
 (def ^:dynamic *pipe* nil)
 
-(defn- coerce-to-string [param]
-  (cond
-   (string? param) param
-   (keyword? param) (name param)
-   :else (str param)))
-
 (defn send-cmd [pool command & params]
-  (let [full-cmd (concat command (map coerce-to-string params))]
+  (let [full-cmd (protocol/->resp (concat command params))]
     (if *pipe*
       (a/put! *pipe* full-cmd)
       (let [cmd-ch (pool/get-connection pool)

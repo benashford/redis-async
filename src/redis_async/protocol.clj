@@ -15,25 +15,93 @@
 (ns redis-async.protocol
   (:require [gloss.core :refer :all]))
 
-(defn- seq->str [byte-v]
+;; Utility functions
+
+(defn seq->str [byte-v]
   (String. (byte-array byte-v)))
 
-(defn- str->seq [^String in-str]
+(defn str->seq [^String in-str]
   (into [] (.getBytes in-str)))
+
+;; Resp types
+
+(defprotocol RespType
+  (get-type [this])
+  (->clj [this]))
+
+(defprotocol ToResp
+  (->resp [this]))
+
+(defrecord Str [string]
+  RespType
+  (get-type [this] :str)
+  (->clj [this] string)
+  ToResp
+  (->resp [this] this))
+
+(defrecord Err [bytes]
+  RespType
+  (get-type [this] :err)
+  (->clj [this]
+    (let [msg (seq->str bytes)]
+      (ex-info (str "Error from Redis:" msg) {:type  :redis
+                                              :msg   msg
+                                              :bytes bytes})))
+  ToResp
+  (->resp [this] this))
+
+(defrecord Int [value]
+  RespType
+  (get-type [this] :int)
+  (->clj [this] value)
+  ToResp
+  (->resp [this] this))
+
+(defrecord BulkStr [bytes]
+  RespType
+  (get-type [this] :bulk-str)
+  (->clj [this] (when bytes (seq->str bytes)))
+  ToResp
+  (->resp [this] this))
+
+(defrecord Ary [values]
+  RespType
+  (get-type [this] :ary)
+  (->clj [this] (map ->clj values))
+  ToResp
+  (->resp [this] this))
+
+(extend-protocol ToResp
+  String
+  (->resp [this] (->BulkStr (str->seq this)))
+  Long
+  (->resp [this] (->Int this))
+  clojure.lang.IPersistentCollection
+  (->resp [this] (->Ary (map ->resp this)))
+  nil
+  (->resp [this] (->BulkStr nil)))
+
+;; Gloss codecs for resp get-types
 
 (defcodec resp-type
   (enum :byte {:str \+ :err \- :int \: :bulk-str \$ :ary \*}))
 
-(defcodec resp-str
-  (string :utf-8 :delimiters ["\r\n"]))
+(def resp-str
+  (compile-frame (string :utf-8 :delimiters ["\r\n"])
+                 (fn [str] (:string str))
+                 (fn [str] (->Str str))))
 
-(defcodec resp-err
+(def resp-err
   (compile-frame (repeated :byte :delimiters ["\r\n"])
-                 (fn [err] (:error (str->seq err)))
-                 (fn [str] {:error (seq->str str)})))
+                 (fn [err] (:bytes err))
+                 (fn [str] (->Err str))))
 
-(defcodec resp-int
-  (string-integer :utf-8 :delimiters ["\r\n"]))
+(def resp-int
+  (compile-frame (string-integer :utf-8 :delimiters ["\r\n"])
+                 (fn [i] (:value i))
+                 (fn [i] (->Int i))))
+
+(def ^:private r-n-bytes (.getBytes "\r\n"))
 
 (defcodec resp-bulk-str
   (header
@@ -42,16 +110,16 @@
      (if (< str-size 0)
        (compile-frame []
                       (fn [_] [])
-                      (fn [_] :nil))
+                      (fn [_] (->BulkStr nil)))
        (compile-frame (repeat (+ str-size 2) :byte)
                       (fn [in-str]
-                        (str->seq (str in-str "\r\n")))
+                        (concat (:bytes in-str) r-n-bytes))
                       (fn [bytes]
-                        (seq->str (subvec bytes 0 (- (count bytes) 2)))))))
+                        (->BulkStr (subvec bytes 0 (- (count bytes) 2)))))))
    (fn [str]
-     (if (keyword? str)
-       -1
-       (count str)))))
+     (if-let [bytes (:bytes str)]
+       (count bytes)
+       -1))))
 
 (declare resp-frame)
 
@@ -63,10 +131,10 @@
       (if (= ary-size 0)
         []
         (repeat ary-size resp-frame))
-      (fn [ary] (mapv #(if (nil? %) :nil %) ary))
-      (fn [ary] (mapv #(if (= % :nil) nil %) ary))))
+      (fn [ary] (:values ary))
+      (fn [ary] (->Ary ary))))
    (fn [ary]
-     (count ary))))
+     (count (:values ary)))))
 
 (def ^:private resp-frames
   {:str      resp-str
@@ -79,12 +147,4 @@
   (header resp-type
           resp-frames
           (fn [data]
-            (cond
-             (or (vector? data) (seq? data))
-             :ary
-
-             (or (keyword? data) (string? data))
-             :bulk-str
-
-             (integer? data)
-             :int))))
+            (get-type data))))

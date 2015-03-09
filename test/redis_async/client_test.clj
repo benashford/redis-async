@@ -1,6 +1,7 @@
 (ns redis-async.client-test
   (:require [redis-async.client :as client]
             [redis-async.core :as core]
+            [redis-async.protocol :as protocol]
             [clojure.test :refer :all]
             [clojure.core.async :as a]))
 
@@ -8,34 +9,41 @@
 
 (defn- make-test-channel [& data]
   (let [c (a/chan)]
-    (a/onto-chan c data true)
+    (a/onto-chan c (map protocol/->resp data) true)
     c))
 
+(defn- make-error [msg]
+  (->> msg
+       protocol/str->seq
+       protocol/->Err))
+
 (deftest <!-test
-  (is (nil? (a/<!! (a/go (client/<! (make-test-channel :nil))))))
+  (is (nil? (a/<!! (a/go (client/<! (make-test-channel nil))))))
   (is (= 1 (a/<!! (a/go (client/<! (make-test-channel 1))))))
   (testing "error handling"
     (is (= {:type :redis
             :msg  "TEST ERROR"}
            (a/<!! (a/go (try
-                          (client/<! (make-test-channel {:error "TEST ERROR"}))
+                          (client/<! (make-test-channel (make-error "TEST ERROR")))
                           (catch clojure.lang.ExceptionInfo e
-                            (ex-data e)))))))))
+                            (select-keys (ex-data e)
+                                         [:type :msg])))))))))
 
 (deftest <!!-test
-  (is (nil? (client/<!! (make-test-channel :nil))))
+  (is (nil? (client/<!! (make-test-channel nil))))
   (is (= 1 (client/<!! (make-test-channel 1))))
   (testing "error handling"
     (is (= {:type :redis
             :msg  "TEST ERROR"}
            (try
-             (client/<!! (make-test-channel {:error "TEST ERROR"}))
+             (client/<!! (make-test-channel (make-error "TEST ERROR")))
              (catch clojure.lang.ExceptionInfo e
-               (ex-data e)))))))
+               (select-keys (ex-data e)
+                            [:type :msg])))))))
 
 (deftest faf-test
   (is (nil? (a/<!! (client/faf (make-test-channel 1 2 3)))))
-  (is (nil? (a/<!! (client/faf (make-test-channel 1 {:error "TEST ERROR"}))))))
+  (is (nil? (a/<!! (client/faf (make-test-channel 1 (make-error "TEST ERROR")))))))
 
 (deftest wait!-test
   (is (nil? (a/<!! (a/go (client/wait! (make-test-channel 1))))))
@@ -43,8 +51,8 @@
     (is (= {:type :redis
             :msgs ["ERR A" "ERR B"]}
            (a/<!! (a/go (try
-                          (client/wait! (make-test-channel {:error "ERR A"}
-                                                           {:error "ERR B"}))
+                          (client/wait! (make-test-channel (make-error "ERR A")
+                                                           (make-error "ERR B")))
                           (catch clojure.lang.ExceptionInfo e
                             (ex-data e)))))))))
 
@@ -54,8 +62,8 @@
     (is (= {:type :redis
             :msgs ["ERR A" "ERR B"]}
            (try
-             (client/wait!! (make-test-channel {:error "ERR A"}
-                                               {:error "ERR B"}))
+             (client/wait!! (make-test-channel (make-error "ERR A")
+                                               (make-error "ERR B")))
              (catch clojure.lang.ExceptionInfo e
                (ex-data e)))))))
 
@@ -74,7 +82,7 @@
 
 (defn- redis-connect [f]
   (binding [*redis-pool* (core/make-pool {})]
-    (is-ok (client/<!! (client/select *redis-pool* 1)))
+    (is-ok (client/<!! (client/select *redis-pool* "1")))
     (is-ok (client/<!! (client/flushdb *redis-pool*)))
     (load-seed-data)
     (f)

@@ -16,7 +16,8 @@
   (:refer-clojure :exclude [time sync keys sort type get set eval])
   (:require [clojure.string :as s]
             [clojure.core.async :as a]
-            [redis-async.core :refer :all]))
+            [redis-async.core :refer :all]
+            [redis-async.protocol :as protocol]))
 
 (defmacro defredis [fn-n]
   (let [cmd (as-> fn-n x
@@ -30,26 +31,20 @@
 
 ;; Useful to enforce conventions
 
-(defn- sub-nils [val]
-  (if (= val :nil)
-    nil
-    val))
-
-(defn- is-error? [msg]
-  (and (map? msg)
-       (:error msg)))
-
 (defn read-value [msg]
-  (if (is-error? msg)
-    (throw (ex-info "Error from Redis" {:type :redis
-                                        :msg  (:error msg)}))
-    (sub-nils msg)))
+  (let [value (protocol/->clj msg)]
+    (if (isa? (class value) clojure.lang.ExceptionInfo)
+      (throw value)
+      value)))
 
 (defmacro <! [expr]
   `(read-value (a/<! ~expr)))
 
 (defmacro <!! [expr]
   `(read-value (a/<!! ~expr)))
+
+(defn- is-error? [v]
+  (= (class v) redis_async.protocol.Err))
 
 (defn faf
   "Fire-and-forget.  Warning: if no error-callback is defined, all errors are
@@ -66,7 +61,7 @@
 (defn check-wait-for-errors [results]
   (let [errs (->> results
                   (filter #(is-error? %))
-                  (map :error))]
+                  (map #(protocol/seq->str (:bytes %))))]
     (when-not (empty? errs)
       (throw (ex-info "Error(s) from Redis" {:type :redis
                                              :msgs errs})))))
