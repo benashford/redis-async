@@ -37,6 +37,10 @@
 (defn- is-error? [v]
   (= (class v) redis_async.protocol.Err))
 
+(defn- is-str? [v]
+  (or (= (class v) redis_async.protocol.Str)
+      (= (class v) redis_async.protocol.BulkStr)))
+
 (defn faf
   "Fire-and-forget.  Warning: if no error-callback is defined, all errors are
   ignored."
@@ -54,8 +58,10 @@
                   (filter #(is-error? %))
                   (map #(protocol/seq->str (:bytes %))))]
     (when-not (empty? errs)
-      (throw (ex-info "Error(s) from Redis" {:type :redis
-                                             :msgs errs})))))
+      (throw (ex-info (str "Error(s) from Redis:"
+                           (pr-str errs))
+                      {:type :redis
+                       :msgs errs})))))
 
 (defmacro wait! [expr]
   `(check-wait-for-errors (a/<! (a/into [] ~expr))))
@@ -71,7 +77,8 @@
        json/decode))
 
 (defn- coerce-to-string [val]
-  (if (string? val)
+  (if (or (string? val)
+          (is-str? val))
     val
     (str val)))
 

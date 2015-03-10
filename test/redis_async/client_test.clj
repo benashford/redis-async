@@ -98,14 +98,15 @@
     (is-ok (client/<!! (with-redis client/set "TEST-KEY" "TEST-VALUE")))
     (is (= 1 (client/<!! (with-redis client/del "TEST-KEY"))))
     (is (= 0 (client/<!! (with-redis client/del "TEST-KEY-DOESNT-EXIST")))))
-  #_(testing "DUMP and RESTORE"
-      (let [pc   (core/pipelined *redis-pool*
-                                 (client/set "DUMP-RESTORE" "DUMP-RESTORE-VALUE")
-                                 (client/dump "DUMP-RESTORE")
-                                 (client/del "DUMP-RESTORE"))
-            _    (client/<!! pc)
-            dump (client/<!! pc)
-            _    (client/<!! pc)]
-        (is (< 0 (count dump)))
-        (client/wait!! (with-redis client/restore "DUMP-RESTORE" 0 dump))
-        (is (= "DUMP-RESTORE-VALUE" (client/<!! (with-redis client/get "DUMP-RESTORE")))))))
+  (testing "DUMP and RESTORE"
+    (let [pc   (core/pipelined *redis-pool*
+                               (client/set "DUMP-RESTORE" "DUMP-RESTORE-VALUE")
+                               (client/dump "DUMP-RESTORE")
+                               (client/del "DUMP-RESTORE"))
+          _    (client/<!! pc)
+          dump (a/<!! pc) ;; Dump returns a binary string, so we need the raw
+                          ;; version
+          _    (client/<!! pc)]
+      (is (< 0 (count dump)))
+      (client/wait!! (with-redis client/restore "DUMP-RESTORE" 0 dump))
+      (is (= "DUMP-RESTORE-VALUE" (client/<!! (with-redis client/get "DUMP-RESTORE")))))))
