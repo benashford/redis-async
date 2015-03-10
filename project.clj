@@ -7,4 +7,5 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [aleph "0.4.0-beta3"]
+                 [cheshire "5.4.0"]
                  [gloss "0.2.4"]])
