@@ -70,15 +70,25 @@
        slurp
        json/decode))
 
-(defn- emit-client-fn [fn-n]
+(defn- coerce-to-string [val]
+  (if (string? val)
+    val
+    (str val)))
+
+(defn- emit-client-fn [fn-n summary]
   (let [cmd  (as-> fn-n x
                (s/split x #"-")
                (mapv s/upper-case x))
         fn-s (symbol fn-n)]
-    `(defn ~fn-s [& ~'params]
+    `(defn ~fn-s
+       ~summary
+       [& ~'params]
        (let [redis#  (when-not *pipe* (first ~'params))
-             params# (if *pipe* ~'params (drop 1 ~'params))]
-         (apply send-cmd redis# ~cmd params#)))))
+             params# (->> (if *pipe*
+                            ~'params
+                            (drop 1 ~'params))
+                          (map coerce-to-string))]
+         (send-cmd redis# ~cmd params#)))))
 
 (defn- generate-commands [commands-meta]
   (for [[command-name command-data] commands-meta]
@@ -87,8 +97,7 @@
           summary      (command-data :summary)
           args         (command-data :arguments)]
       (println "Function:" fn-name)
-      (println "Args" (pr-str args))
-      (emit-client-fn fn-name))))
+      (emit-client-fn fn-name summary))))
 
 (let [cmd-meta (load-commands-meta)
       fn-defs  (generate-commands cmd-meta)]

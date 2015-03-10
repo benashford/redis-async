@@ -78,7 +78,7 @@
 
 (def ^:dynamic *pipe* nil)
 
-(defn send-cmd [pool command & params]
+(defn send-cmd [pool command params]
   (let [full-cmd (protocol/->resp (concat command params))]
     (if *pipe*
       (a/put! *pipe* full-cmd)
