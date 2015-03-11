@@ -109,4 +109,6 @@
           _    (client/<!! pc)]
       (is (< 0 (count dump)))
       (client/wait!! (with-redis client/restore "DUMP-RESTORE" 0 dump))
-      (is (= "DUMP-RESTORE-VALUE" (client/<!! (with-redis client/get "DUMP-RESTORE")))))))
+      (is (= "DUMP-RESTORE-VALUE" (client/<!! (with-redis client/get "DUMP-RESTORE"))))))
+  (testing "EXISTS"
+    (is (= 1 (client/<!! (with-redis client/exists "TEST-STRING"))))))
