@@ -91,13 +91,16 @@
 (defn- with-redis [f & params]
   (apply f *redis-pool* params))
 
+(defn- get-with-redis [f & params]
+  (client/<!! (apply with-redis f params)))
+
 (use-fixtures :once redis-connect)
 
 (deftest keys-test
   (testing "DEL"
-    (is-ok (client/<!! (with-redis client/set "TEST-KEY" "TEST-VALUE")))
-    (is (= 1 (client/<!! (with-redis client/del "TEST-KEY"))))
-    (is (= 0 (client/<!! (with-redis client/del "TEST-KEY-DOESNT-EXIST")))))
+    (is-ok (get-with-redis client/set "TEST-KEY" "TEST-VALUE"))
+    (is (= 1 (get-with-redis client/del "TEST-KEY")))
+    (is (= 0 (get-with-redis client/del "TEST-KEY-DOESNT-EXIST"))))
   (testing "DUMP and RESTORE"
     (let [pc   (core/pipelined *redis-pool*
                                (client/set "DUMP-RESTORE" "DUMP-RESTORE-VALUE")
@@ -109,6 +112,19 @@
           _    (client/<!! pc)]
       (is (< 0 (count dump)))
       (client/wait!! (with-redis client/restore "DUMP-RESTORE" 0 dump))
-      (is (= "DUMP-RESTORE-VALUE" (client/<!! (with-redis client/get "DUMP-RESTORE"))))))
+      (is (= "DUMP-RESTORE-VALUE" (get-with-redis client/get "DUMP-RESTORE")))))
   (testing "EXISTS"
-    (is (= 1 (client/<!! (with-redis client/exists "TEST-STRING"))))))
+    (is (= 1 (get-with-redis client/exists "TEST-STRING"))))
+  (testing "EXPIRE"
+    (client/wait!! (with-redis client/set "EXPIRE-TEST" "EXPIRE-VALUE"))
+    (client/wait!! (with-redis client/expire "EXPIRE-TEST" 1))
+    (is (= "EXPIRE-VALUE" (get-with-redis client/get "EXPIRE-TEST")))
+    (Thread/sleep 1000)
+    (is (nil? (get-with-redis client/get "EXPIRE-TEST"))))
+  (testing "EXPIREAT"
+    (client/wait!! (with-redis client/set "EXPIREAT-TEST" "EXPIREAT-VALUE"))
+    (client/wait!! (with-redis client/expireat "EXPIREAT-TEST"
+                     (inc (long (/ (System/currentTimeMillis) 1000)))))
+    (is (= "EXPIREAT-VALUE" (get-with-redis client/get "EXPIREAT-TEST")))
+    (Thread/sleep 1000)
+    (is (nil? (get-with-redis client/get "EXPIREAT-TEST")))))
