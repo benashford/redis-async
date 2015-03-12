@@ -68,8 +68,6 @@ The convenience functions for dealing with channels follow the same naming conve
 
 ## Still to-do
 
-1. Auto-generate client functions from commands.json
-1. Binary strings - e.g. "DUMP" command.  (Consider making byte-arrays the default, or change the default on a per-command basis - e.g. DUMP and RESTORE should be binary, everything else implicitely converted to strings.)
 1. Test coverage.
 1. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
 2. The 'monitor' command.
