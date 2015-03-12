@@ -142,3 +142,12 @@
                                    (client/sadd "SORT-TEST" "B")
                                    (client/sadd "SORT-TEST" "W")))
     (is (= ["A" "B" "W" "Z"] (get-with-redis client/sort "SORT-TEST" :alpha)))))
+
+(deftest strings-test
+  (testing "GET, SET, INCR, INCRBY, DECR, DECRBY"
+    (client/wait!! (with-redis client/set "STEST" 1))
+    (client/wait!! (with-redis client/incr "STEST"))
+    (client/wait!! (with-redis client/incrby "STEST" 100))
+    (client/wait!! (with-redis client/decr "STEST"))
+    (client/wait!! (with-redis client/decrby "STEST" 10))
+    (is (= "91" (get-with-redis client/get "STEST")))))
