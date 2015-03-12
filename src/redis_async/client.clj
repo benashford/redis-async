@@ -77,10 +77,16 @@
        json/decode))
 
 (defn- coerce-to-string [val]
-  (if (or (string? val)
-          (is-str? val))
-    val
-    (str val)))
+  (cond
+   (or (string? val)
+       (is-str? val))
+   val
+
+   (keyword? val)
+   (-> val name s/upper-case)
+
+   :else
+   (str val)))
 
 (defn- emit-client-fn [fn-n summary]
   (let [cmd  (as-> fn-n x

@@ -97,6 +97,7 @@
 (use-fixtures :once redis-connect)
 
 (deftest keys-test
+  ;; Test a sample of functions of Redis commands in the 'KEYS' category.
   (testing "DEL"
     (is-ok (get-with-redis client/set "TEST-KEY" "TEST-VALUE"))
     (is (= 1 (get-with-redis client/del "TEST-KEY")))
@@ -127,4 +128,17 @@
                      (inc (long (/ (System/currentTimeMillis) 1000)))))
     (is (= "EXPIREAT-VALUE" (get-with-redis client/get "EXPIREAT-TEST")))
     (Thread/sleep 1000)
-    (is (nil? (get-with-redis client/get "EXPIREAT-TEST")))))
+    (is (nil? (get-with-redis client/get "EXPIREAT-TEST"))))
+  (testing "KEYS"
+    (is (= ["TEST-STRING"] (get-with-redis client/keys "TEST-ST*"))))
+  (testing "OBJECT"
+    (is (< 0 (get-with-redis client/object :refcount "TEST-STRING")))
+    (is (= "raw" (get-with-redis client/object :encoding "TEST-STRING")))
+    (is (< 0 (get-with-redis client/object :idletime "TEST-STRING"))))
+  (testing "SORT"
+    (client/wait!! (core/pipelined *redis-pool*
+                                   (client/sadd "SORT-TEST" "A")
+                                   (client/sadd "SORT-TEST" "Z")
+                                   (client/sadd "SORT-TEST" "B")
+                                   (client/sadd "SORT-TEST" "W")))
+    (is (= ["A" "B" "W" "Z"] (get-with-redis client/sort "SORT-TEST" :alpha)))))
