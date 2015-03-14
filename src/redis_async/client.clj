@@ -23,10 +23,12 @@
 ;; Useful to enforce conventions
 
 (defn read-value [msg]
-  (let [value (protocol/->clj msg)]
-    (if (isa? (class value) clojure.lang.ExceptionInfo)
-      (throw value)
-      value)))
+  (if-not (nil? msg)
+    (let [value (protocol/->clj msg)]
+      (if (isa? (class value) clojure.lang.ExceptionInfo)
+        (throw value)
+        value))
+    (throw (ex-info "Expected message, actually nil" {}))))
 
 (defmacro <! [expr]
   `(read-value (a/<! ~expr)))

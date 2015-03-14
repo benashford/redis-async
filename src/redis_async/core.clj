@@ -35,16 +35,43 @@
   "Send commands to Redis.  Commands are read from cmds-ch, each one written
    causes a signal on written-c.  Does so asynchronously."
   [connection written-c cmds-ch]
-  (a/go-loop [c (a/<! cmds-ch)]
-    (if (nil? c)
-      (a/close! written-c)
-      (do
-        (a/put! written-c true)
-        (->> c
-             (io/encode protocol/resp-frame)
-             io/contiguous
-             (stream/put! connection))
-        (recur (a/<! cmds-ch))))))
+  (a/go
+    (try
+      (loop [c (a/<! cmds-ch)]
+        (if (nil? c)
+          (a/close! written-c)
+          (do
+            (a/put! written-c true)
+            (->> c
+                 (io/encode protocol/resp-frame)
+                 io/contiguous
+                 (stream/put! connection))
+            (recur (a/<! cmds-ch)))))
+      (catch Throwable t
+        (println "SEND COMMANDS ERROR:" t)
+        (a/close! written-c)
+        t))))
+
+(defrecord ClientErr [t]
+  protocol/RespType
+  (get-type [this] :client-err)
+  (->clj [this]
+    (let [msg (.getMessage t)]
+      (ex-info (str "Error talking to Redis: " msg) {:type  :redis-client
+                                                     :msg   msg
+                                                     :cause t}))))
+
+(defn- write-error-to [ch t]
+  (a/put! ch (->ClientErr t)))
+
+(defn- drain
+  "If a connection has failed, respond to the remaining incoming messages with
+   an error."
+  [ch t]
+  (a/go-loop [cmd (a/<! ch)]
+    (let [ret-c (:ret-c cmd)]
+      (write-error-to ret-c t)
+      (a/close! ret-c))))
 
 (defn- process-stream
   "Process the stream specified by the specified connection"
@@ -52,20 +79,34 @@
   (let [cmd-ch     (:cmd-ch con)
         in-c       (:in-c con)
         connection (:connection con)]
-    (a/go-loop [cmd (a/<! cmd-ch)]
-      (if (nil? cmd)
-        (stop-connection con)
-        (do
-          (let [{:keys [ret-c cmds]} cmd
-                written-c            (a/chan)]
-            (send-commands connection written-c cmds)
-            (loop [w (a/<! written-c)]
-              (when w
-                (when-let [r (a/<! in-c)]
-                  (a/>! ret-c r))
-                (recur (a/<! written-c))))
-            (a/close! ret-c))
-          (recur (a/<! cmd-ch)))))))
+    (a/go
+      (try
+        (loop [cmd (a/<! cmd-ch)]
+          (if (nil? cmd)
+            (stop-connection con)
+            (do
+              (let [{:keys [ret-c cmds]} cmd
+                    written-c            (a/chan)
+                    c-c                  (send-commands connection written-c cmds)]
+                (try
+                  (loop [w (a/<! written-c)]
+                    (when w
+                      (if-let [r (a/<! in-c)]
+                        (a/>! ret-c r)
+                        (throw (ex-info "Unexpected empty response" {})))
+                      (recur (a/<! written-c))))
+                  (a/close! ret-c)
+                  (when-let [send-commands-result (a/<! c-c)]
+                    (throw send-commands-result))
+                  (catch Throwable t
+                    (write-error-to ret-c t)
+                    (a/close! ret-c)
+                    (throw t))))
+              (recur (a/<! cmd-ch)))))
+        (catch Throwable t
+          (println "PROCESS STREAM ERROR:" t)
+          (drain cmd-ch t)
+          (a/close! cmd-ch))))))
 
 (defrecord Connection [pool connection cmd-ch in-c]
   ConnectionLifecycle
@@ -111,11 +152,13 @@
       (let [cmd-ch (:cmd-ch (pool/get-connection pool))
             ret-c  (a/chan 1)
             cmds   (a/chan)]
-        (a/put! cmd-ch {:ret-c ret-c
-                        :cmds  cmds})
-        (a/put! cmds full-cmd)
-        (a/close! cmds)
-        ret-c))))
+        (if (a/put! cmd-ch {:ret-c ret-c
+                            :cmds  cmds})
+          (do
+            (a/put! cmds full-cmd)
+            (a/close! cmds)
+            ret-c)
+          (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch})))))))
 
 (defmacro pipelined [pool & body]
   `(binding [*pipe* (a/chan)]

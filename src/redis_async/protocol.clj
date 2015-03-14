@@ -44,9 +44,9 @@
   (get-type [this] :err)
   (->clj [this]
     (let [msg (seq->str bytes)]
-      (ex-info (str "Error from Redis:" msg) {:type  :redis
-                                              :msg   msg
-                                              :bytes bytes})))
+      (ex-info (str "Error from Redis: " msg) {:type  :redis
+                                               :msg   msg
+                                               :bytes bytes})))
   ToResp
   (->resp [this] this))
 
