@@ -68,19 +68,19 @@ The convenience functions for dealing with channels follow the same naming conve
 
 ## Still to-do
 
-1. Test coverage.
-1. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
+1. Testing/handling bad/failed connections.
+2. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
 2. The 'monitor' command.
 3. Pub/sub commands.
 4. Transaction commands.
+1. Test coverage.
+1. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
 5. Publish to Clojars
 6. Ensure backpressure is handled correctly.
 7. Documentation.
 8. Redis authentication.
 9. Scripting support.
-10. Testing/handling bad/failed connections.
 11. Ensure efficient pipelining (at present it's sending each command one-by-one anyway)
-12. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
 14. Create Clojure 1.7 version using transducers
 15. Benchmarking
 16. Split pipelined commands into multiple packages when exceeding limits, and/or add a buffered channel of the right size.
