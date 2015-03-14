@@ -31,6 +31,21 @@
   (start-connection [this])
   (stop-connection [this]))
 
+(defn- send-commands
+  "Send commands to Redis.  Commands are read from cmds-ch, each one written
+   causes a signal on written-c.  Does so asynchronously."
+  [connection written-c cmds-ch]
+  (a/go-loop [c (a/<! cmds-ch)]
+    (if (nil? c)
+      (a/close! written-c)
+      (do
+        (a/put! written-c true)
+        (->> c
+             (io/encode protocol/resp-frame)
+             io/contiguous
+             (stream/put! connection))
+        (recur (a/<! cmds-ch))))))
+
 (defn- process-stream
   "Process the stream specified by the specified connection"
   [con]
@@ -43,22 +58,11 @@
         (do
           (let [{:keys [ret-c cmds]} cmd
                 written-c            (a/chan)]
-            (a/go-loop [c (a/<! cmds)]
-              (if (nil? c)
-                (a/close! written-c)
-                (do
-                  (a/put! written-c true)
-                  (->> c
-                       (io/encode protocol/resp-frame)
-                       io/contiguous
-                       (stream/put! connection))
-                  (recur (a/<! cmds)))))
+            (send-commands connection written-c cmds)
             (loop [w (a/<! written-c)]
               (when w
-                (let [r (a/<! in-c)]
-                  (if r
-                    (a/>! ret-c r)
-                    (assert r "No result")))
+                (when-let [r (a/<! in-c)]
+                  (a/>! ret-c r))
                 (recur (a/<! written-c))))
             (a/close! ret-c))
           (recur (a/<! cmd-ch)))))))
