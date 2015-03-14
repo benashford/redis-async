@@ -18,7 +18,7 @@
 
 (defprotocol ConnectionFactory
   (test-con [this con])
-  (new-con [this])
+  (new-con [this pool])
   (close-con [this con]))
 
 (defprotocol Pool
@@ -34,7 +34,7 @@
                    (rand-nth @connections))]
          (cond
           (nil? con)
-          (let [con (new-con connection-factory)]
+          (let [con (new-con connection-factory this)]
             (alter connections conj con)
             con)
 

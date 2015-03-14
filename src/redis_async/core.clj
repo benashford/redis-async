@@ -27,20 +27,19 @@
 
 (def pipelined-buffer-size 1000)
 
-(defn- open-connection
-  "Given a map containing connection details to a redis instance, returns a
-   channel through which requests can be made.  Closing the channel will
-   shutdown"
-  [redis]
-  (let [redis      (merge default-redis redis)
-        connection @(tcp/client redis)
-        in-stream  (io/decode-stream connection protocol/resp-frame)
-        in-c       (a/chan)
-        cmd-ch     (a/chan)]
-    (stream/connect in-stream in-c)
+(defprotocol ConnectionLifecycle
+  (start-connection [this])
+  (stop-connection [this]))
+
+(defn- process-stream
+  "Process the stream specified by the specified connection"
+  [con]
+  (let [cmd-ch     (:cmd-ch con)
+        in-c       (:in-c con)
+        connection (:connection con)]
     (a/go-loop [cmd (a/<! cmd-ch)]
       (if (nil? cmd)
-        (stream/close! connection)
+        (stop-connection con)
         (do
           (let [{:keys [ret-c cmds]} cmd
                 written-c            (a/chan)]
@@ -62,16 +61,39 @@
                     (assert r "No result")))
                 (recur (a/<! written-c))))
             (a/close! ret-c))
-          (recur (a/<! cmd-ch)))))
-    cmd-ch))
+          (recur (a/<! cmd-ch)))))))
+
+(defrecord Connection [pool connection cmd-ch in-c]
+  ConnectionLifecycle
+  (start-connection [this]
+    (let [cmd-ch     (a/chan)
+          in-c       (a/chan)
+          in-stream  (io/decode-stream connection protocol/resp-frame)]
+      (stream/connect in-stream in-c)
+      (let [new-con (->Connection pool connection cmd-ch in-c)]
+        (process-stream new-con)
+        new-con)))
+  (stop-connection [this]
+    (stream/close! connection)
+    (->Connection pool nil nil nil)))
+
+(defmethod clojure.core/print-method Connection [x writer]
+  (.write writer (str (class x) "@" (System/identityHashCode x))))
+
+(defn- make-connection [pool redis]
+  (let [redis (merge default-redis redis)
+        con   @(tcp/client redis)]
+    (->Connection pool con nil nil)))
 
 (defn make-pool
   "Make a connection pool to a specific redis thing"
   [redis]
   (pool/make-pool (reify pool/ConnectionFactory
                     (test-con [this con] true)
-                    (new-con [this] (open-connection redis))
-                    (close-con [this con] (a/close! con)))))
+                    (new-con [this pool]
+                      (->> (make-connection pool redis)
+                           start-connection))
+                    (close-con [this con] (stop-connection con)))))
 
 (defn close-pool [pool]
   (pool/close-pool pool))
@@ -82,7 +104,7 @@
   (let [full-cmd (protocol/->resp (concat command params))]
     (if *pipe*
       (a/put! *pipe* full-cmd)
-      (let [cmd-ch (pool/get-connection pool)
+      (let [cmd-ch (:cmd-ch (pool/get-connection pool))
             ret-c  (a/chan 1)
             cmds   (a/chan)]
         (a/put! cmd-ch {:ret-c ret-c
@@ -93,7 +115,7 @@
 
 (defmacro pipelined [pool & body]
   `(binding [*pipe* (a/chan)]
-     (let [cmd-ch# (pool/get-connection ~pool)
+     (let [cmd-ch# (:cmd-ch (pool/get-connection ~pool))
            ch#     (a/chan pipelined-buffer-size)]
        (a/put! cmd-ch# {:ret-c ch#
                         :cmds  *pipe*})
