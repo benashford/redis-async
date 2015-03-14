@@ -70,6 +70,7 @@ The convenience functions for dealing with channels follow the same naming conve
 
 1. Testing/handling bad/failed connections.
 2. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
+3. Ensure failed-connection exceptions are consistent enough for clients to handle and take appropriate actions.
 2. The 'monitor' command.
 3. Pub/sub commands.
 4. Transaction commands.
