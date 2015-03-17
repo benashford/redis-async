@@ -68,14 +68,11 @@ The convenience functions for dealing with channels follow the same naming conve
 
 ## Still to-do
 
-1. Testing/handling bad/failed connections.
-2. Ensure that closed connections remove themselves from the connection pool. (Or ensure that closure via the connection-pool is the only way to do it.)
-3. Ensure failed-connection exceptions are consistent enough for clients to handle and take appropriate actions.
-2. The 'monitor' command.
-3. Pub/sub commands.
-4. Transaction commands.
-1. Test coverage.
-1. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
+1. The 'monitor' command.
+2. Pub/sub commands.
+3. Transaction commands.
+4. Test coverage.
+5. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
 5. Publish to Clojars
 6. Ensure backpressure is handled correctly.
 7. Documentation.

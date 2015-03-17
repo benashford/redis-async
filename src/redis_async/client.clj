@@ -37,7 +37,9 @@
   `(read-value (a/<!! ~expr)))
 
 (defn- is-error? [v]
-  (= (class v) redis_async.protocol.Err))
+  (let [klass (class v)]
+    (or (= klass redis_async.protocol.Err)
+        (= klass redis_async.core.ClientErr))))
 
 (defn- is-str? [v]
   (or (= (class v) redis_async.protocol.Str)
