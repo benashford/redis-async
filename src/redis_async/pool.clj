@@ -24,34 +24,61 @@
 (defprotocol Pool
   (get-connection [this])
   (close-connection [this con])
+  (borrow-connection [this])
+  (return-connection [this con])
   (close-pool [this]))
 
-(defrecord ConnectionPool [connection-factory connections]
+(defn- pick-connection
+  "Pick a connection from a pool, or open a new one"
+  [pool]
+  (let [connection-factory (:connection-factory pool)
+        connections        (:connections pool)
+        con                (when-not (empty? @connections)
+                             (rand-nth @connections))]
+    (cond
+      (nil? con)
+      (let [con (new-con connection-factory pool)]
+        (alter connections conj con)
+        con)
+
+      (test-con connection-factory con)
+      con
+
+      :else
+      (do
+        (close-connection pool con)
+        nil))))
+
+(defn- remove-connection [connections con]
+  (alter connections #(remove #{con} %)))
+
+(defrecord ConnectionPool [connection-factory connections borrowed-connections]
   Pool
   (get-connection [this]
     (loop []
       (dosync
-       (let [con (when-not (empty? @connections)
-                   (rand-nth @connections))]
-         (cond
-          (nil? con)
-          (let [con (new-con connection-factory this)]
-            (alter connections conj con)
-            con)
-
-          (test-con connection-factory con)
-          con
-
-          :else
-          (do
-            (close-connection this con)
-            (recur)))))))
+       (if-let [con (pick-connection this)]
+         con
+         (recur)))))
   (close-connection [this con]
     (dosync
-     (alter connections #(remove #{con} %))))
+     (remove-connection connections con)))
+  (borrow-connection [this]
+    (loop []
+      (dosync
+       (if-let [con (pick-connection this)]
+         (do
+           (remove-connection connections con)
+           (alter borrowed-connections conj con)
+           con)
+         (recur)))))
+  (return-connection [this con]
+    (dosync
+     (remove-connection borrowed-connections con)
+     (alter connections conj con)))
   (close-pool [this]
     (doseq [connection @connections]
       (close-con connection-factory connection))))
 
 (defn make-pool [con-fac]
-  (ConnectionPool. con-fac (ref [])))
+  (->ConnectionPool con-fac (ref []) (ref [])))
