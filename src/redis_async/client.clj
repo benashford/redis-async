@@ -18,6 +18,7 @@
             [clojure.core.async :as a]
             [cheshire.core :as json]
             [redis-async.core :refer :all]
+            [redis-async.pool :as pool]
             [redis-async.protocol :as protocol]))
 
 ;; Useful to enforce conventions
@@ -73,7 +74,39 @@
 (defmacro wait!! [expr]
   `(check-wait-for-errors (a/<!! (a/into [] ~expr))))
 
+;; Specific commands, the others are auto-generated later
+
+(defn monitor [pool]
+  (let [con     (pool/borrow-connection pool)
+        cmds    (a/chan)
+        close-c (a/chan)
+        cmd-ch  (:cmd-ch con)
+        in-c    (:in-c con)
+        ret-c   (a/chan)
+        tmp-c   (a/chan)]
+    (a/go
+      (a/>! cmd-ch {:ret-c tmp-c
+                    :cmds  cmds})
+      (a/>! cmds (protocol/->resp ["MONITOR"]))
+      (let [ok (a/<! tmp-c)]
+        (if (= (protocol/->clj ok) "OK")
+          (loop [[v _] (a/alts! [in-c close-c])]
+            (if-not v
+              (do
+                (a/close! ret-c)
+                (pool/return-connection pool con))
+              (do
+                (a/>! ret-c v)
+                (recur (a/alts! [in-c close-c])))))
+          (do
+            (a/close! ret-c)
+            (pool/return-connection pool con)))))
+    [ret-c close-c]))
+
 ;; Commands
+
+(def ^:private overriden-clients
+  #{"monitor"})
 
 (defn- load-commands-meta []
   (->> "https://raw.githubusercontent.com/antirez/redis-doc/master/commands.json"
@@ -108,9 +141,10 @@
          (send-cmd redis# ~cmd params#)))))
 
 (defn- generate-commands [commands-meta]
-  (for [[command-name command-data] commands-meta]
-    (let [fn-name      (-> command-name s/lower-case (s/replace " " "-"))
-          command-data (clojure.walk/keywordize-keys command-data)
+  (for [[command-name command-data] commands-meta
+        :let [fn-name (-> command-name s/lower-case (s/replace " " "-"))]
+        :when (not (overriden-clients fn-name))]
+    (let [command-data (clojure.walk/keywordize-keys command-data)
           summary      (command-data :summary)
           args         (command-data :arguments)]
       (println "Function:" fn-name)
