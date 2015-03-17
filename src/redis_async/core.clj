@@ -18,7 +18,7 @@
             [clojure.string :as s]
             [manifold.stream :as stream]
             [gloss.io :as io]
-            [redis-async.pool :as pool]
+            [redis-async.pool :as pool :refer [close-connection]]
             [redis-async.protocol :as protocol]))
 
 (def ^:private default-redis
@@ -104,8 +104,8 @@
                     (throw t))))
               (recur (a/<! cmd-ch)))))
         (catch Throwable t
-          (println "PROCESS STREAM ERROR:" t)
           (drain cmd-ch t)
+          (stop-connection con)
           (a/close! cmd-ch))))))
 
 (defrecord Connection [pool connection cmd-ch in-c]
@@ -119,6 +119,7 @@
         (process-stream new-con)
         new-con)))
   (stop-connection [this]
+    (pool/close-connection pool this)
     (stream/close! connection)
     (->Connection pool nil nil nil)))
 

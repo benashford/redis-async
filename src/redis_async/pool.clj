@@ -23,6 +23,7 @@
 
 (defprotocol Pool
   (get-connection [this])
+  (close-connection [this con])
   (close-pool [this]))
 
 (defrecord ConnectionPool [connection-factory connections]
@@ -43,8 +44,11 @@
 
           :else
           (do
-            (alter connections #(remove #{con} %))
+            (close-connection this con)
             (recur)))))))
+  (close-connection [this con]
+    (dosync
+     (alter connections #(remove #{con} %))))
   (close-pool [this]
     (doseq [connection @connections]
       (close-con connection-factory connection))))
