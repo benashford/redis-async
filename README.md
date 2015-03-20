@@ -10,7 +10,14 @@ Will be available via Clojars when it reaches the appropriate levels of complete
 
 ## Design goals
 
-There are two primary design goals.  First, to be async, using `core.async`, to be easily used in an application already heavily based around that.  Second, to be as close to the Redis API as much as possible; it is a low-level API, but a very useful one.
+There are two primary design goals.  First, to be async, using `core.async`, for the purposes of being easily used in an application already heavily based around that.  Second, to be as close to the Redis API as much as possible; it is a low-level API, but a very useful one.
+
+## Features
+
+* Full (when complete) implementation of all Redis commands.
+* Support for Lua scripting (not yet started).
+* Multiplex many concurrent requests onto a single Redis connection.
+* Implicit pipelining.
 
 ## How to use
 
@@ -35,26 +42,17 @@ There are two primary design goals.  First, to be async, using `core.async`, to 
 
 ```
 
-Each Redis command has an equivalent function in `redis-async.client`.  These can be called passing the connection pool as the first parameter, or alternatively, commands can be pipelined in which case the pool can be omitted because it's used as a parameter to the pipeline instead.
-
-Example of pipelining:
-
-```clojure
-;; assumes p is a pool as per previous example
-
-(wait!! (pipelined p (set "X" "TEST1") (set "Y" "TEST2"))
-
-(def ch (pipelined p (get "X") (get "Y")))
-
-(<!! ch) ;; "TEST1"
-(<!! ch) ;; "TEST2"
-```
+Each Redis command has an equivalent function in `redis-async.client`.  These can be called passing the connection pool as the first parameter.
 
 #### Client functions
 
 Each function that implements a Redis command returns a channel, from which the result of that command can be read.  These can be read like any other `core.async` channel, or one of the convenience functions/macros can be used instead; the main difference between the convenience options and anything else is that they ensure conventions are in place (e.g. it allows a Redis operation to return nil, usually you cannot send nil through a `core.async` channel).
 
-*IMPORTANT* Each channel should be fully consumed, otherwise a connection may become stuck.
+##### Exceptions to the rule
+
+The vast majority of Redis commands are simple request/response commands.  There are a number however with behave differently, in that they either: a) return an arbitrary/infinite number of results, or b) are blocking.  These are implemented seperately with slightly different semantics.
+
+TODO: details.
 
 #### Other client functions
 
@@ -66,9 +64,22 @@ The convenience functions for dealing with channels follow the same naming conve
 
 `faf` is "fire-and-forget", just move on.  This will ensure the channel is fully consumed, but doesn't wait.
 
+## Why not just use ...?
+
+TBC: list of similarities and differences with other libraries
+
+## Performance
+
+### Implicit pipelining
+
+Unlike most other Redis clients, `redis-async` will automatically pipeline multiple commands issued within a similar frame of time into a single request/response cycle.  It does so in a way that does not improve the worst case, but significantly improves the best case.
+
+TODO: examples.
+
 ## Still to-do
 
-1. Make pipelining implicit
+1. Implicit pipelining examples.
+2. Document commands that don't make sense in an async context.
 1. The 'monitor' command.
 2. Document the 'monitor' command.
 3. Pattern of cmds channel on cmd-ch channel is repeated.  Should be DRY'ed.
