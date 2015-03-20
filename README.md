@@ -69,6 +69,10 @@ The convenience functions for dealing with channels follow the same naming conve
 ## Still to-do
 
 1. The 'monitor' command.
+2. Document the 'monitor' command.
+3. Pattern of cmds channel on cmd-ch channel is repeated.  Should be DRY'ed.
+3. Make pipelining implicit
+4. Make all return channels the correct size
 2. Pub/sub commands.
 3. Transaction commands.
 4. Test coverage.
