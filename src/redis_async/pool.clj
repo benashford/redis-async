@@ -64,18 +64,14 @@
     (dosync
      (remove-connection connections con)))
   (borrow-connection [this]
-    (loop []
-      (dosync
-       (if-let [con (pick-connection this)]
-         (do
-           (remove-connection connections con)
-           (alter borrowed-connections conj con)
-           con)
-         (recur)))))
-  (return-connection [this con]
     (dosync
-     (remove-connection borrowed-connections con)
-     (alter connections conj con)))
+     (let [con (new-con connection-factory this)]
+       (alter borrowed-connections conj con)
+       con)))
+  (return-connection [this con]
+    (close-con connection-factory con)
+    (dosync
+     (remove-connection borrowed-connections con)))
   (close-pool [this]
     (doseq [connection @connections]
       (close-con connection-factory connection))))
