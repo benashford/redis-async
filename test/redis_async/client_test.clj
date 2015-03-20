@@ -103,14 +103,11 @@
     (is (= 1 (get-with-redis client/del "TEST-KEY")))
     (is (= 0 (get-with-redis client/del "TEST-KEY-DOESNT-EXIST"))))
   (testing "DUMP and RESTORE"
-    (let [pc   (core/pipelined *redis-pool*
-                               (client/set "DUMP-RESTORE" "DUMP-RESTORE-VALUE")
-                               (client/dump "DUMP-RESTORE")
-                               (client/del "DUMP-RESTORE"))
-          _    (client/<!! pc)
-          dump (a/<!! pc) ;; Dump returns a binary string, so we need the raw
-                          ;; version
-          _    (client/<!! pc)]
+    (let [_    (client/faf (with-redis client/set "DUMP-RESTORE" "DUMP-RESTORE-VALUE"))
+          dump (a/<!! (with-redis client/dump "DUMP-RESTORE"))
+          ;; Dump returns a binary string, so we need the raw
+          ;; version
+          _    (client/faf (with-redis client/del "DUMP-RESTORE"))]
       (is (< 0 (count dump)))
       (client/wait!! (with-redis client/restore "DUMP-RESTORE" 0 dump))
       (is (= "DUMP-RESTORE-VALUE" (get-with-redis client/get "DUMP-RESTORE")))))
@@ -136,11 +133,8 @@
     (is (= "raw" (get-with-redis client/object :encoding "TEST-STRING")))
     (is (< 0 (get-with-redis client/object :idletime "TEST-STRING"))))
   (testing "SORT"
-    (client/wait!! (core/pipelined *redis-pool*
-                                   (client/sadd "SORT-TEST" "A")
-                                   (client/sadd "SORT-TEST" "Z")
-                                   (client/sadd "SORT-TEST" "B")
-                                   (client/sadd "SORT-TEST" "W")))
+    (doseq [d ["A" "Z" "B" "W"]]
+      (client/faf (with-redis client/sadd "SORT-TEST" d)))
     (is (= ["A" "B" "W" "Z"] (get-with-redis client/sort "SORT-TEST" :alpha)))))
 
 (deftest strings-test

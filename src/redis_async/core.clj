@@ -25,32 +25,9 @@
   {:host "localhost"
    :port 6379})
 
-(def pipelined-buffer-size 1000)
-
 (defprotocol ConnectionLifecycle
   (start-connection [this])
   (stop-connection [this]))
-
-(defn- send-commands
-  "Send commands to Redis.  Commands are read from cmds-ch, each one written
-   causes a signal on written-c.  Does so asynchronously."
-  [connection written-c cmds-ch]
-  (a/go
-    (try
-      (loop [c (a/<! cmds-ch)]
-        (if (nil? c)
-          (a/close! written-c)
-          (do
-            (a/put! written-c true)
-            (->> c
-                 (io/encode protocol/resp-frame)
-                 io/contiguous
-                 (stream/put! connection))
-            (recur (a/<! cmds-ch)))))
-      (catch Throwable t
-        (println "SEND COMMANDS ERROR:" t)
-        (a/close! written-c)
-        t))))
 
 (defrecord ClientErr [t]
   protocol/RespType
@@ -69,41 +46,74 @@
    an error."
   [ch t]
   (a/go-loop [cmd (a/<! ch)]
-    (let [ret-c (:ret-c cmd)]
+    (when-let [ret-c (:ret-c cmd)]
       (write-error-to ret-c t)
-      (a/close! ret-c))))
+      (a/close! ret-c)
+      (recur (a/<! ch)))))
+
+(def ^:private pipelineable-size 16)
+
+(defn- send-commands
+  "Asynchronously sends commands to Redis."
+  [connection cmd-ch ret-c-c]
+  (let [end (atom false)]
+    (a/go
+      (try
+        (loop []
+          (let [[frames
+                 ret-cs] (loop [frames []
+                                ret-cs []]
+                           (let [[val ch] (if (empty? frames)
+                                            [(a/<! cmd-ch) cmd-ch]
+                                            (a/alts! [cmd-ch] :default :no-command))]
+                             (cond
+                               (= val :no-command)
+                               [frames ret-cs]
+
+                               (nil? val)
+                               (do
+                                 (reset! end true)
+                                 [frames ret-cs])
+
+                               :else
+                               (let [[cmd ret-c] val]
+                                 (recur (conj frames
+                                              (io/encode protocol/resp-frame cmd))
+                                        (conj ret-cs ret-c))))))]
+            (when-not (empty? frames)
+              (stream/put! connection (-> frames flatten io/contiguous))
+              (doseq [ret-c ret-cs]
+                (a/>! ret-c-c ret-c))))
+          (if @end
+            (a/close! ret-c-c)
+            (recur)))
+        (catch Throwable t
+          (a/close! ret-c-c)
+          t)))))
 
 (defn- process-stream
   "Process the stream specified by the specified connection"
   [con]
   (let [cmd-ch     (:cmd-ch con)
         in-c       (:in-c con)
-        connection (:connection con)]
+        connection (:connection con)
+        ret-c-c    (a/chan pipelineable-size)]
     (a/go
       (try
-        (loop [cmd (a/<! cmd-ch)]
-          (if (nil? cmd)
-            (stop-connection con)
-            (do
-              (let [{:keys [ret-c cmds]} cmd
-                    written-c            (a/chan)
-                    c-c                  (send-commands connection written-c cmds)]
-                (try
-                  (loop [w (a/<! written-c)]
-                    (when w
-                      (if-let [r (a/<! in-c)]
-                        (a/>! ret-c r)
-                        (throw (ex-info "Unexpected empty response" {})))
-                      (recur (a/<! written-c))))
-                  (a/close! ret-c)
-                  (when-let [send-commands-result (a/<! c-c)]
-                    (throw send-commands-result))
-                  (catch Throwable t
-                    (write-error-to ret-c t)
-                    (a/close! ret-c)
-                    (throw t))))
-              (recur (a/<! cmd-ch)))))
+        (let [c-c (send-commands connection cmd-ch ret-c-c)]
+          (loop [ret-c (a/<! ret-c-c)]
+            (if (nil? ret-c)
+              (do
+                (stop-connection con)
+                (when-let [send-commands-result (a/<! c-c)]
+                  (throw send-commands-result)))
+              (do
+                (a/>! ret-c (a/<! in-c))
+                (a/close! ret-c)
+                (recur (a/<! ret-c-c))))))
         (catch Throwable t
+          (println "ERROR:" t)
+          (.printStackTrace t)
           (drain cmd-ch t)
           (stop-connection con)
           (a/close! cmd-ch))))))
@@ -144,29 +154,10 @@
 (defn close-pool [pool]
   (pool/close-pool pool))
 
-(def ^:dynamic *pipe* nil)
-
 (defn send-cmd [pool command params]
   (let [full-cmd (protocol/->resp (concat command params))]
-    (if *pipe*
-      (a/put! *pipe* full-cmd)
-      (let [cmd-ch (:cmd-ch (pool/get-connection pool))
-            ret-c  (a/chan 1)
-            cmds   (a/chan)]
-        (if (a/put! cmd-ch {:ret-c ret-c
-                            :cmds  cmds})
-          (do
-            (a/put! cmds full-cmd)
-            (a/close! cmds)
-            ret-c)
-          (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch})))))))
-
-(defmacro pipelined [pool & body]
-  `(binding [*pipe* (a/chan)]
-     (let [cmd-ch# (:cmd-ch (pool/get-connection ~pool))
-           ch#     (a/chan pipelined-buffer-size)]
-       (a/put! cmd-ch# {:ret-c ch#
-                        :cmds  *pipe*})
-       ~@body
-       (a/close! *pipe*)
-       ch#)))
+    (let [cmd-ch (:cmd-ch (pool/get-connection pool))
+          ret-c  (a/chan 1)]
+      (if (a/put! cmd-ch [full-cmd ret-c])
+        ret-c
+        (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch}))))))

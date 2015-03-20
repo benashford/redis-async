@@ -133,10 +133,8 @@
     `(defn ~fn-s
        ~summary
        [& ~'params]
-       (let [redis#  (when-not *pipe* (first ~'params))
-             params# (->> (if *pipe*
-                            ~'params
-                            (drop 1 ~'params))
+       (let [redis#  (first ~'params)
+             params# (->> (drop 1 ~'params)
                           (map coerce-to-string))]
          (send-cmd redis# ~cmd params#)))))
 
