@@ -77,11 +77,12 @@
 
                                :else
                                (let [[cmd ret-c] val]
-                                 (recur (conj frames
-                                              (io/encode protocol/resp-frame cmd))
+                                 (recur (conj frames cmd)
                                         (conj ret-cs ret-c))))))]
             (when-not (empty? frames)
-              (stream/put! connection (-> frames flatten io/contiguous))
+              (stream/put! connection (->> frames
+                                           (io/encode-all protocol/resp-frame)
+                                           io/contiguous))
               (doseq [ret-c ret-cs]
                 (a/>! ret-c-c ret-c))))
           (if @end
