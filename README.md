@@ -150,6 +150,7 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 ## Still to-do
 
 1. Identify performance bottlenecks/trade-offs.
+2. Look into dropping gloss
 1. Performance testing.
 2. Document commands that don't make sense in an async context.
 3. The 'monitor' command.
