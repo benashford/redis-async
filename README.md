@@ -6,7 +6,7 @@ Development for an asynchronous Redis client for Clojure.  Currently under devel
 
 ## Availability
 
-Will be available via Clojars when it reaches the appropriate levels of completeness and stability.
+Will be available via Clojars when it reaches the appropriate levels of completeness, stability and performance.
 
 A snapshot of a (recent) development version is available on Clojars:
 
@@ -79,6 +79,8 @@ TBC: list of similarities and differences with other libraries
 
 ## Performance
 
+TODO: some benchmarks
+
 ### Implicit pipelining
 
 Unlike most other Redis clients, `redis-async` will automatically pipeline multiple commands issued within a similar frame of time into a single request/response cycle.  It does so in a way that does not harm the worst case, but significantly improves the best case.
@@ -147,15 +149,16 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
+1. Identify performance bottlenecks/trade-offs.
 1. Performance testing.
 2. Document commands that don't make sense in an async context.
 3. The 'monitor' command.
 4. Document the 'monitor' command.
 5. Pub/sub commands.
 6. Transaction commands.
+7. Release 0.1.0 version.
 7. Test coverage.
 8. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
-9. Publish to Clojars
 10. Redis authentication.
 11. Scripting support.
 12. Create Clojure 1.7 version using transducers
