@@ -17,7 +17,6 @@
             [clojure.core.async :as a]
             [clojure.string :as s]
             [manifold.stream :as stream]
-            [gloss.io :as io]
             [redis-async.pool :as pool :refer [close-connection]]
             [redis-async.protocol :as protocol]))
 
@@ -81,8 +80,7 @@
                                         (conj ret-cs ret-c))))))]
             (when-not (empty? frames)
               (stream/put! connection (->> frames
-                                           (io/encode-all protocol/resp-frame)
-                                           io/contiguous))
+                                           protocol/encode-all))
               (doseq [ret-c ret-cs]
                 (a/>! ret-c-c ret-c))))
           (if @end
@@ -122,10 +120,11 @@
 (defrecord Connection [pool connection cmd-ch in-c]
   ConnectionLifecycle
   (start-connection [this]
-    (let [cmd-ch     (a/chan)
-          in-c       (a/chan)
-          in-stream  (io/decode-stream connection protocol/resp-frame)]
-      (stream/connect in-stream in-c)
+    (let [cmd-ch   (a/chan)
+          in-raw-c (a/chan)
+          in-c     (a/chan)]
+      (stream/connect connection in-raw-c)
+      (protocol/decode in-raw-c in-c)
       (let [new-con (->Connection pool connection cmd-ch in-c)]
         (process-stream new-con)
         new-con)))
