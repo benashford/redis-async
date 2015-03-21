@@ -8,6 +8,10 @@ Development for an asynchronous Redis client for Clojure.  Currently under devel
 
 Will be available via Clojars when it reaches the appropriate levels of completeness and stability.
 
+A snapshot of a (recent) development version is available on Clojars:
+
+[![Clojars Project](http://clojars.org/redis-async/latest-version.svg)](http://clojars.org/redis-async)
+
 ## Design goals
 
 There are two primary design goals.  First, to be async, using `core.async`, for the purposes of being easily used in an application already heavily based around that.  Second, to be as close to the Redis API as much as possible; it is a low-level API, but a very useful one.
@@ -24,19 +28,20 @@ There are two primary design goals.  First, to be async, using `core.async`, for
 ### Simple interactive example
 
 ```clojure
-(require '[redis-async.client :refer :all])
+(require '[redis-async.core :as redis-async])
+(require '[redis-async.client :as client])
 
 ;; Build a connection pool
 
-(def p (make-pool {:hostname "localhost" :port 6379}))
+(def p (redis-async/make-pool {:hostname "localhost" :port 6379}))
 
 ;; Set a value
 
-(<!! (set p "KEY1" "VALUE-A"))
+(<!! (client/set p "KEY1" "VALUE-A"))
 
 ;; Get a value
 
-(<!! (get p "KEY1"))
+(<!! (client/get p "KEY1"))
 
 ;; Will show "VALUE-A"
 
