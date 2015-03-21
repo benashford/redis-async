@@ -144,23 +144,17 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 1. Performance testing.
 2. Document commands that don't make sense in an async context.
-1. The 'monitor' command.
-2. Document the 'monitor' command.
-3. Pattern of cmds channel on cmd-ch channel is repeated.  Should be DRY'ed.
-4. Make all return channels the correct size
-2. Pub/sub commands.
-3. Transaction commands.
-4. Test coverage.
-5. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
-5. Publish to Clojars
-6. Ensure backpressure is handled correctly.
-7. Documentation.
-8. Redis authentication.
-9. Scripting support.
-11. Ensure efficient pipelining (at present it's sending each command one-by-one anyway)
-14. Create Clojure 1.7 version using transducers
-15. Benchmarking
-16. Split pipelined commands into multiple packages when exceeding limits, and/or add a buffered channel of the right size.
+3. The 'monitor' command.
+4. Document the 'monitor' command.
+5. Pub/sub commands.
+6. Transaction commands.
+7. Test coverage.
+8. Gloss - test finite-frame rather than producing specific frames of arbitrary size.
+9. Publish to Clojars
+10. Redis authentication.
+11. Scripting support.
+12. Create Clojure 1.7 version using transducers
+13. Split pipelined commands into multiple packages when exceeding limits, and/or add a buffered channel of the right size.
 
 ## License
 
