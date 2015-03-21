@@ -152,3 +152,9 @@
       fn-defs  (generate-commands cmd-meta)]
   (doseq [fn-def fn-defs]
     (clojure.core/eval fn-def)))
+
+;; DELETE ME - temporary functions for ad-hoc benchmarking
+
+(defn ping-1000 [p]
+  (let [cs (doall (repeatedly 1000 #(ping p)))]
+    (mapv #(<!! %) cs)))
