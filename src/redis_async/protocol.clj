@@ -218,8 +218,10 @@
                          :else
                          (cons input other-input))]
       (if (or end last-run)
-        {:scanned scanned-bufs
-         :input   other-input
+        {:scanned (when end scanned-bufs)
+         :input   (if end
+                    other-input
+                    (concat scanned-bufs other-input))
          :end     end}
         (recur other-input
                scanned-bufs)))))
