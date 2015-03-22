@@ -115,7 +115,8 @@
 ;; above
 
 (def ^:private byte->mode
-  {43 :+})
+  {43 :+
+   45 :-})
 
 (def ^:private first-delimiter 13)
 (def ^:private second-delimiter 10)
@@ -194,14 +195,24 @@
           (update-in [:scanned] concat (:scanned result)))
      (:input result)]))
 
+(defn- process-error
+  "For most purposes an error is the same as a simple-string"
+  [current-state input]
+  (process-simple-string current-state input))
+
 (def ^:private process-fns
-  {:+ process-simple-string})
+  {:+ process-simple-string
+   :- process-error})
 
 (defn- result-simple-string [{:keys [scanned] :as state}]
   (->Str (byte-streams/convert scanned String)))
 
+(defn- result-error [{:keys [scanned] :as state}]
+  (->Err (byte-streams/convert scanned String)))
+
 (def ^:private result-fns
-  {:+ result-simple-string})
+  {:+ result-simple-string
+   :- result-error})
 
 (defn- mode-result [mode state]
   (let [result-fn (result-fns mode)]
@@ -248,7 +259,9 @@
           (if (not mode)
             ;; discover next mode
             (let [[next-input & other-input] input
-                  next-mode                  (byte->mode (.get next-input))]
+                  first-byte                 (.get next-input)
+                  _                          (println "FIRST BYTE:" first-byte)
+                  next-mode                  (byte->mode first-byte)]
               (recur input (conj other-state {:mode next-mode})))
             ;; we know the mode
             (let [[input current-state] (process-state current-state input)]

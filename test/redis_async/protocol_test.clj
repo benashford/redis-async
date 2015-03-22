@@ -24,9 +24,9 @@
   (testing "simple strings"
     (is (= (->Str "TEST")
            (decode-one (dec "+TEST\r\n")))))
-  #_(testing "errors"
-    (is (= (->Err (str->seq "I AM AN ERROR"))
-           (decode "-I AM AN ERROR\r\n"))))
+  (testing "errors"
+    (is (= (->Err "I AM AN ERROR")
+           (decode-one (dec "-I AM AN ERROR\r\n")))))
   #_(testing "integers"
     (is (= (->resp 1) (io/decode resp-frame (.getBytes ":1\r\n"))))
     (is (= (->resp 100) (io/decode resp-frame (.getBytes ":100\r\n"))))
