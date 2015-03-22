@@ -148,7 +148,7 @@
                      (- byte-count available))
               {:scanned scanned
                :input   '()
-               :end     false}))
+               :end     (= available byte-count)}))
           (let [old-pos   (.position first-input)
                 end-pos   (+ old-pos byte-count)
                 _         (.position first-input end-pos)
