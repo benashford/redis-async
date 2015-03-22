@@ -127,12 +127,12 @@
 (defn- scan-for
   "Scan forward a set number of bytes"
   [input byte-count]
-  #_(println "SCAN-FOR|input:" (pr-str input)
+  (println "SCAN-FOR|input:" (pr-str input)
            "byte-count:" byte-count)
   (loop [[^ByteBuffer first-input & other-input] input
          scanned-bufs                            []
          byte-count                              byte-count]
-    #_(println "SCAN-FOR(loop)|input:" (pr-str (cons first-input other-input))
+    (println "SCAN-FOR(loop)|input:" (pr-str (cons first-input other-input))
              "scanned-bufs:"         (pr-str scanned-bufs)
              "byte-count:"           (pr-str byte-count))
     (if (= byte-count 0)
@@ -141,12 +141,20 @@
        :end     true}
       (let [available (.remaining first-input)]
         (if (<= available byte-count)
-          (recur other-input
-                 (conj scanned-bufs first-input)
-                 (- byte-count available))
-          (let [_ (.position first-input byte-count)
+          (let [scanned (conj scanned-bufs first-input)]
+            (if other-input
+              (recur other-input
+                     scanned
+                     (- byte-count available))
+              {:scanned scanned
+               :input   '()
+               :end     false}))
+          (let [old-pos   (.position first-input)
+                end-pos   (+ old-pos byte-count)
+                _         (.position first-input end-pos)
                 out-scope (.slice first-input)
-                _ (.limit first-input byte-count)]
+                _         (.position first-input old-pos)
+                _         (.limit first-input end-pos)]
             (recur (cons out-scope other-input)
                    (conj scanned-bufs first-input)
                    0)))))))
@@ -162,7 +170,7 @@
   ;; so slice at the first unread byte
   (loop [[^ByteBuffer first-input & other-input] (cons (.slice first-input) other-input)
          scanned-bufs                            []]
-    #_(println "SCAN-UNTIL-DELIMITER|input:" (pr-str (cons first-input other-input))
+    (println "SCAN-UNTIL-DELIMITER|input:" (pr-str (cons first-input other-input))
              "scanned-bufs:" (pr-str scanned-bufs))
     (assert (not (nil? first-input)))
     (let [last-run      (nil? other-input)
@@ -170,7 +178,7 @@
                   ^ByteBuffer input
                   end]} (loop [pos       0
                                last-char nil]
-                          #_(println "SUBSCAN|first-input:" (pr-str first-input)
+                          (println "SUBSCAN|first-input:" (pr-str first-input)
                                    "pos:" pos
                                    "last-char:" last-char)
                           (if (= pos (.limit first-input))
@@ -243,7 +251,7 @@
   "Process a bulk string, this takes the form of a header saying the length of
   the string, followed by the string surrounded by delimiters"
   [current-state input]
-  #_(println "PROCESS BULK STRING|current-state:" (pr-str current-state)
+  (println "PROCESS BULK STRING|current-state:" (pr-str current-state)
            "input:" (pr-str input))
   (if-let [size (:size current-state)]
     ;; size is already known, so can read the rest
@@ -253,7 +261,8 @@
       [(-> current-state
            (assoc :end (:end result))
            (update-in [:scanned] concat scanned)
-           (update-in [:got] + (reduce + 0 (map #(.remaining %) scanned))))])
+           (update-in [:got] + (reduce + 0 (map #(.remaining %) scanned))))
+       (:input result)])
     ;; size is not yet known, so needs to be determined
     (let [result        (scan-until-delimiter input)
           current-state (-> current-state
@@ -282,7 +291,7 @@
   (->Int (parse-int scanned)))
 
 (defn- result-bulk-string [{:keys [scanned] :as state}]
-  #_(println "RESULT-BULK-STRING|state:" (pr-str state))
+  (println "RESULT-BULK-STRING|state:" (pr-str state))
   (let [^ByteBuffer combined-buffer (->byte-buffer scanned)]
     (.limit combined-buffer (- (.remaining combined-buffer) 2))
     (->BulkStr (byte-streams/to-byte-array combined-buffer))))
@@ -303,8 +312,8 @@
   "Process the current state, as much as possible, in a non-blocking manner.
    Returns the new state and any left-over input."
   [{:keys [mode] :as current-state} input]
-  #_(println "PROCESS STATE|current-state:" (pr-str current-state)
-             "PROCESS STATE|input:" (pr-str input))
+  (println "PROCESS STATE|current-state:" (pr-str current-state)
+           "PROCESS STATE|input:" (pr-str input))
   (let [process-fn        (process-fns mode)
         [new-state input] (if process-fn
                             (process-fn current-state input)
@@ -321,20 +330,22 @@
     (loop [[^ByteBuffer next-input & other-input :as input] '()
            state                                '({})]
       ;; Debugging - to be deleted
-      #_(println "LOOP STATE: input empty -" (empty? input))
-      #_(clojure.pprint/pprint {:input input :state state})
+      (println "LOOP STATE: input empty -" (empty? input))
+      (clojure.pprint/pprint {:input input :state state})
       ;; Do we have any bytes to read
       (if (or (nil? next-input)
               (= (.remaining next-input) 0))
         ;; Nope, read some bytes and recur with the same state
-        (let [^ByteBuf more-input (a/<! raw-ch)]
-          #_(println "NEW INPUT:" (pr-str more-input))
-          (if more-input
-            (recur (list (.nioBuffer more-input))
-                   state)
-            (do
-              (println "Closing connection with state:" (pr-str state))
-              (a/close! in-ch))))
+        (do
+          (println "WAITING FOR NEW INPUT")
+          (let [^ByteBuf more-input (a/<! raw-ch)]
+            (println "NEW INPUT:" (pr-str more-input))
+            (if more-input
+              (recur (list (.nioBuffer more-input))
+                     state)
+              (do
+                (println "Closing connection with state:" (pr-str state))
+                (a/close! in-ch)))))
         (let [[current-state & other-state] state
               mode                          (:mode current-state)]
           (if (not mode)
@@ -344,10 +355,12 @@
               (recur input (conj other-state {:mode next-mode})))
             ;; we know the mode
             (let [[input current-state] (process-state current-state input)]
+              (println "PROCESSED STATE|input:" (pr-str input))
               (if (:end current-state)
                 (let [result (:result current-state)]
                   (if (empty? other-state)
                     (do
+                      (println "--RESP-->" (pr-str result))
                       (a/>! in-ch result)
                       (recur input other-state))
                     (recur input (let [[next-state remaining-states] other-state]

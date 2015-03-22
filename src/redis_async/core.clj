@@ -121,8 +121,8 @@
   ConnectionLifecycle
   (start-connection [this]
     (let [cmd-ch   (a/chan)
-          in-raw-c (a/chan)
-          in-c     (a/chan)]
+          in-raw-c (a/chan pipelineable-size)
+          in-c     (a/chan pipelineable-size)]
       (stream/connect connection in-raw-c)
       (protocol/decode in-raw-c in-c)
       (let [new-con (->Connection pool connection cmd-ch in-c)]

@@ -38,8 +38,8 @@
     (is (str= (->resp "TEST") (decode-one (dec "$4\r\nTEST\r\n"))))
     (is (str= (->resp "TEST\r\nTEST")
               (decode-one (dec "$10\r\nTEST\r\nTEST\r\n"))))
-    #_(is (= (->resp "") (io/decode resp-frame (.getBytes "$0\r\n\r\n"))))
-    #_(is (= (->resp nil) (io/decode resp-frame (.getBytes "$-1\r\n")))))
+    (is (str= (->resp "") (decode-one (dec "$0\r\n\r\n"))))
+    (is (= (->resp nil) (decode-one (dec "$-1\r\n")))))
   #_(testing "arrays"
     (is (= (->resp []) (io/decode resp-frame (.getBytes "*0\r\n"))))
     (is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))

@@ -149,7 +149,7 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Look into dropping gloss
+1. Calls to scan-until-delimiter are cutting delimiter in half
 2. Re-enable disabled tests before merging into master
 1. Identify performance bottlenecks/trade-offs.
 1. Performance testing.
