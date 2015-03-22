@@ -149,8 +149,9 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
+1. Look into dropping gloss
+2. Re-enable disabled tests before merging into master
 1. Identify performance bottlenecks/trade-offs.
-2. Look into dropping gloss
 1. Performance testing.
 2. Use Leiningen profiles to enable benchmarking configuration, to keep seperate from usual code.
 2. Document commands that don't make sense in an async context.

@@ -61,7 +61,7 @@
 (defn check-wait-for-errors [results]
   (let [errs (->> results
                   (filter #(is-error? %))
-                  (map #(protocol/seq->str (:bytes %))))]
+                  (map protocol/->clj))]
     (when-not (empty? errs)
       (throw (ex-info (str "Error(s) from Redis:"
                            (pr-str errs))
