@@ -27,10 +27,10 @@
   (testing "errors"
     (is (= (->Err "I AM AN ERROR")
            (decode-one (dec "-I AM AN ERROR\r\n")))))
-  #_(testing "integers"
-    (is (= (->resp 1) (io/decode resp-frame (.getBytes ":1\r\n"))))
-    (is (= (->resp 100) (io/decode resp-frame (.getBytes ":100\r\n"))))
-    (is (= (->resp -10) (io/decode resp-frame (.getBytes ":-10\r\n")))))
+  (testing "integers"
+    (is (= (->resp 1) (decode-one (dec ":1\r\n"))))
+    (is (= (->resp 100) (decode-one (dec ":100\r\n"))))
+    (is (= (->resp -10) (decode-one (dec ":-10\r\n")))))
   #_(testing "bulk string"
     (is (= (->resp "TEST") (io/decode resp-frame (.getBytes "$4\r\nTEST\r\n"))))
     (is (= (->resp "TEST\r\nTEST")

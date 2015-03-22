@@ -115,8 +115,9 @@
 ;; above
 
 (def ^:private byte->mode
-  {43 :+
-   45 :-})
+  {43 :str
+   45 :err
+   58 :int})
 
 (def ^:private first-delimiter 13)
 (def ^:private second-delimiter 10)
@@ -200,9 +201,15 @@
   [current-state input]
   (process-simple-string current-state input))
 
+(defn- process-int
+  "For most purposes an int is the same as a simple-string"
+  [current-state input]
+  (process-simple-string current-state input))
+
 (def ^:private process-fns
-  {:+ process-simple-string
-   :- process-error})
+  {:str process-simple-string
+   :err process-error
+   :int process-int})
 
 (defn- result-simple-string [{:keys [scanned] :as state}]
   (->Str (byte-streams/convert scanned String)))
@@ -210,9 +217,14 @@
 (defn- result-error [{:keys [scanned] :as state}]
   (->Err (byte-streams/convert scanned String)))
 
+(defn- result-int [{:keys [scanned] :as state}]
+  (->Int (->> (byte-streams/convert scanned String)
+              Integer/parseInt)))
+
 (def ^:private result-fns
-  {:+ result-simple-string
-   :- result-error})
+  {:str result-simple-string
+   :err result-error
+   :int result-int})
 
 (defn- mode-result [mode state]
   (let [result-fn (result-fns mode)]
