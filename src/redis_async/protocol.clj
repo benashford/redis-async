@@ -117,10 +117,38 @@
 (def ^:private byte->mode
   {43 :str
    45 :err
-   58 :int})
+   58 :int
+   36 :bulk-str})
 
 (def ^:private first-delimiter 13)
 (def ^:private second-delimiter 10)
+
+(defn- scan-for
+  "Scan forward a set number of bytes"
+  [input byte-count]
+  (println "SCAN-FOR|input:" (pr-str input)
+           "byte-count:" byte-count)
+  (loop [[^ByteBuffer first-input & other-input] input
+         scanned-bufs                            []
+         byte-count                              byte-count]
+    (println "SCAN-FOR(loop)|input:" (pr-str (cons first-input other-input))
+             "scanned-bufs:"         (pr-str scanned-bufs)
+             "byte-count:"           (pr-str byte-count))
+    (if (= byte-count 0)
+      {:scanned scanned-bufs
+       :input   (cons first-input other-input)
+       :end     true}
+      (let [available (.remaining first-input)]
+        (if (<= available byte-count)
+          (recur other-input
+                 (conj scanned-bufs first-input)
+                 (- byte-count available))
+          (let [_ (.position first-input byte-count)
+                out-scope (.slice first-input)
+                _ (.limit first-input byte-count)]
+            (recur (cons out-scope other-input)
+                   (conj scanned-bufs first-input)
+                   0)))))))
 
 (defn- scan-until-delimiter
   "Scan input - defined as a sequence of ByteBuffers - until the delimiter is
@@ -156,12 +184,15 @@
                             (if (and (= last-char first-delimiter)
                                      (= byte-at-pos second-delimiter))
                               ;; end of sequence found
-                              {:scanned (.limit first-input (dec pos))
-                               :input   (.slice first-input)
+                              {:input   (.slice first-input)
+                               :scanned (.limit first-input (dec pos))
                                :end     true}
                               ;; carry on
                               (recur (inc pos)
                                      byte-at-pos))))
+          _            (println "SUBSCAN FINISHED|scanned:" (pr-str scanned)
+                                "input:" (pr-str input)
+                                "end:" (pr-str end))
           [next-input & rest-input] other-input
           scanned-bufs (conj scanned-bufs (do
                                             (.rewind scanned)
@@ -188,7 +219,8 @@
                scanned-bufs)))))
 
 (defn- process-simple-string
-  "Process a simple string, this is an arbitrary number of bytes ending with \r\n"
+  "Process a simple string, this is an arbitrary number of bytes ending with
+   delimiter"
   [current-state input]
   (let [result (scan-until-delimiter input)]
     [(-> current-state
@@ -206,10 +238,41 @@
   [current-state input]
   (process-simple-string current-state input))
 
+(defn- parse-int [scanned]
+  (->> (byte-streams/convert scanned String) Integer/parseInt))
+
+(defn- process-bulk-string
+  "Process a bulk string, this takes the form of a header saying the length of
+  the string, followed by the string surrounded by delimiters"
+  [current-state input]
+  (println "PROCESS BULK STRING|current-state:" (pr-str current-state)
+           "input:" (pr-str input))
+  (if-let [size (:size current-state)]
+    ;; size is already known, so can read the rest
+    (let [needed  (- size (:got current-state))
+          result  (scan-for input needed)
+          scanned (:scanned result)]
+      [(-> current-state
+           (assoc :end (:end result))
+           (update-in [:scanned] concat scanned)
+           (update-in [:got] + (reduce + 0 (map #(.remaining %) scanned))))])
+    ;; size is not yet known, so needs to be determined
+    (let [result        (scan-until-delimiter input)
+          current-state (-> current-state
+                            (assoc :end (:end result))
+                            (update-in [:scanned] concat (:scanned result)))]
+      [(if (:end current-state)
+          {:mode  (:mode current-state)
+           :size  (+ (parse-int (:scanned current-state)) 2)
+           :got   0}
+          current-state)
+       (:input result)])))
+
 (def ^:private process-fns
-  {:str process-simple-string
-   :err process-error
-   :int process-int})
+  {:str      process-simple-string
+   :err      process-error
+   :int      process-int
+   :bulk-str process-bulk-string})
 
 (defn- result-simple-string [{:keys [scanned] :as state}]
   (->Str (byte-streams/convert scanned String)))
@@ -218,13 +281,19 @@
   (->Err (byte-streams/convert scanned String)))
 
 (defn- result-int [{:keys [scanned] :as state}]
-  (->Int (->> (byte-streams/convert scanned String)
-              Integer/parseInt)))
+  (->Int (parse-int scanned)))
+
+(defn- result-bulk-string [{:keys [scanned] :as state}]
+  (println "RESULT-BULK-STRING|state:" (pr-str state))
+  (let [^ByteBuffer combined-buffer (->byte-buffer scanned)]
+    (.limit combined-buffer (- (.remaining combined-buffer) 2))
+    (->BulkStr (byte-streams/to-byte-array combined-buffer))))
 
 (def ^:private result-fns
-  {:str result-simple-string
-   :err result-error
-   :int result-int})
+  {:str      result-simple-string
+   :err      result-error
+   :int      result-int
+   :bulk-str result-bulk-string})
 
 (defn- mode-result [mode state]
   (let [result-fn (result-fns mode)]

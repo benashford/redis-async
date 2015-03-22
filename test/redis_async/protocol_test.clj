@@ -20,6 +20,9 @@
         val
         :timeout))))
 
+(defn- str= [a b]
+  (byte-streams/bytes= (:bytes a) (:bytes b)))
+
 (deftest decoding-test
   (testing "simple strings"
     (is (= (->Str "TEST")
@@ -31,12 +34,12 @@
     (is (= (->resp 1) (decode-one (dec ":1\r\n"))))
     (is (= (->resp 100) (decode-one (dec ":100\r\n"))))
     (is (= (->resp -10) (decode-one (dec ":-10\r\n")))))
-  #_(testing "bulk string"
-    (is (= (->resp "TEST") (io/decode resp-frame (.getBytes "$4\r\nTEST\r\n"))))
-    (is (= (->resp "TEST\r\nTEST")
-           (io/decode resp-frame (.getBytes "$10\r\nTEST\r\nTEST\r\n"))))
-    (is (= (->resp "") (io/decode resp-frame (.getBytes "$0\r\n\r\n"))))
-    (is (= (->resp nil) (io/decode resp-frame (.getBytes "$-1\r\n")))))
+  (testing "bulk string"
+    (is (str= (->resp "TEST") (decode-one (dec "$4\r\nTEST\r\n"))))
+    (is (str= (->resp "TEST\r\nTEST")
+              (decode-one (dec "$10\r\nTEST\r\nTEST\r\n"))))
+    #_(is (= (->resp "") (io/decode resp-frame (.getBytes "$0\r\n\r\n"))))
+    #_(is (= (->resp nil) (io/decode resp-frame (.getBytes "$-1\r\n")))))
   #_(testing "arrays"
     (is (= (->resp []) (io/decode resp-frame (.getBytes "*0\r\n"))))
     (is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))
