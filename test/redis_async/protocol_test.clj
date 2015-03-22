@@ -1,25 +1,43 @@
 (ns redis-async.protocol-test
-  (:require [redis-async.protocol :refer :all]
+  (:require [clojure.core.async :as a]
+            [redis-async.protocol :refer :all]
             [clojure.test :refer :all]))
 
-#_(deftest decoding-test
+(defn- dec
+  "Prepare a test string into a raw channel"
+  [string]
+  (let [raw-c (a/chan)
+        bytes (byte-streams/convert string java.nio.ByteBuffer)]
+    (a/put! raw-c (list bytes))
+    (a/close! raw-c)
+    raw-c))
+
+(defn- decode-one [raw-c]
+  (let [in-c (a/chan)]
+    (decode raw-c in-c)
+    (let [[val ch] (a/alts!! [in-c (a/timeout 1000)])]
+      (if (= ch in-c)
+        val
+        :timeout))))
+
+(deftest decoding-test
   (testing "simple strings"
     (is (= (->Str "TEST")
-           (decode-one (.getBytes "+TEST\r\n")))))
-  (testing "errors"
+           (decode-one (dec "+TEST\r\n")))))
+  #_(testing "errors"
     (is (= (->Err (str->seq "I AM AN ERROR"))
            (decode "-I AM AN ERROR\r\n"))))
-  (testing "integers"
+  #_(testing "integers"
     (is (= (->resp 1) (io/decode resp-frame (.getBytes ":1\r\n"))))
     (is (= (->resp 100) (io/decode resp-frame (.getBytes ":100\r\n"))))
     (is (= (->resp -10) (io/decode resp-frame (.getBytes ":-10\r\n")))))
-  (testing "bulk string"
+  #_(testing "bulk string"
     (is (= (->resp "TEST") (io/decode resp-frame (.getBytes "$4\r\nTEST\r\n"))))
     (is (= (->resp "TEST\r\nTEST")
            (io/decode resp-frame (.getBytes "$10\r\nTEST\r\nTEST\r\n"))))
     (is (= (->resp "") (io/decode resp-frame (.getBytes "$0\r\n\r\n"))))
     (is (= (->resp nil) (io/decode resp-frame (.getBytes "$-1\r\n")))))
-  (testing "arrays"
+  #_(testing "arrays"
     (is (= (->resp []) (io/decode resp-frame (.getBytes "*0\r\n"))))
     (is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))
     (is (= (->resp [(->Str "TEST")])

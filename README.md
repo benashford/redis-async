@@ -154,6 +154,7 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 1. Identify performance bottlenecks/trade-offs.
 1. Performance testing.
 2. Use Leiningen profiles to enable benchmarking configuration, to keep seperate from usual code.
+3. Much better logging/error handling.
 2. Document commands that don't make sense in an async context.
 3. The 'monitor' command.
 4. Document the 'monitor' command.
