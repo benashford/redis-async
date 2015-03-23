@@ -299,40 +299,45 @@
       ;; Debugging - to be deleted
       (println "LOOP STATE:")
       (clojure.pprint/pprint {:input input :state state})
-      ;; Do we have any bytes to read
-      (if (or (nil? input)
-              (= (.remaining input) 0)) ;; zero is wrong, depends on state
-        (do
-          (println "WAITING FOR NEW INPUT")
-          (let [^ByteBuf more-input (a/<! raw-ch)]
-            (println "NEW INPUT:" (pr-str more-input))
-            (if more-input
-              (recur (->nio more-input) ;; join left over input with new input
-                     state)
-              (do
-                (println "Closing connection with state:" (pr-str state))
-                (a/close! in-ch)))))
-        (let [[current-state & other-state] state
-              mode                          (:mode current-state)]
-          (if (not mode)
-            ;; discover next mode
-            (let [first-byte (.get input)
-                  next-mode  (byte->mode first-byte)]
-              (recur input (conj other-state {:mode next-mode})))
-            ;; we know the mode
-            (let [[input current-state] (process-state current-state input)]
-              (println "PROCESSED STATE|input:" (pr-str input))
-              (if (:end current-state)
-                (let [result (:result current-state)]
-                  (if (empty? other-state)
-                    (do
-                      (println "--RESP-->" (pr-str result))
-                      (a/>! in-ch result)
-                      (recur input other-state))
-                    (recur input (let [[next-state remaining-states] other-state]
-                                   (cons (update-in next-state [:scanned] conj result)
-                                         remaining-states)))))
-                (recur input (conj other-state current-state))))))))))
+      (let [readable-bytes (if input
+                             (.remaining input)
+                             0)]
+        ;; Do we have any bytes to read
+        (if (< readable-bytes 2)
+          (do
+            (println "WAITING FOR NEW INPUT")
+            (let [more-input             (a/<! raw-ch)
+                  ^ByteBuffer more-input (->nio more-input)]
+              (println "NEW INPUT:" (pr-str more-input))
+              (if more-input
+                (recur (if input
+                         (->byte-buffer [input more-input])
+                         more-input) ;; join left over input with new input
+                       state)
+                (do
+                  (println "Closing connection with state:" (pr-str state))
+                  (a/close! in-ch)))))
+          (let [[current-state & other-state] state
+                mode                          (:mode current-state)]
+            (if (not mode)
+              ;; discover next mode
+              (let [first-byte (.get input)
+                    next-mode  (byte->mode first-byte)]
+                (recur input (conj other-state {:mode next-mode})))
+              ;; we know the mode
+              (let [[input current-state] (process-state current-state input)]
+                (println "PROCESSED STATE|input:" (pr-str input))
+                (if (:end current-state)
+                  (let [result (:result current-state)]
+                    (if (empty? other-state)
+                      (do
+                        (println "--RESP-->" (pr-str result))
+                        (a/>! in-ch result)
+                        (recur input other-state))
+                      (recur input (let [[next-state remaining-states] other-state]
+                                     (cons (update-in next-state [:scanned] conj result)
+                                           remaining-states)))))
+                  (recur input (conj other-state current-state)))))))))))
 
 (defn encode-one [frame]
   (->raw frame))
