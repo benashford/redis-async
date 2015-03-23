@@ -19,7 +19,7 @@
   [string]
   (let [raw-c (a/chan)
         bytes (string->byte-buffer string)]
-    (a/put! raw-c (list bytes))
+    (a/put! raw-c bytes)
     (a/close! raw-c)
     raw-c))
 
@@ -153,18 +153,18 @@
   (is (= [{:scanned [] :size 3 :got 0} ""]
          (process-bulk-string-wrapper {:scanned ["3"]} "\r\n"))))
 
-#_(deftest decoding-test
+(deftest decoding-test
   (testing "simple strings"
     (is (= (->Str "TEST")
            (decode-one (dec "+TEST\r\n")))))
-  (testing "errors"
+  #_(testing "errors"
     (is (= (->Err "I AM AN ERROR")
            (decode-one (dec "-I AM AN ERROR\r\n")))))
-  (testing "integers"
+  #_(testing "integers"
     (is (= (->resp 1) (decode-one (dec ":1\r\n"))))
     (is (= (->resp 100) (decode-one (dec ":100\r\n"))))
     (is (= (->resp -10) (decode-one (dec ":-10\r\n")))))
-  (testing "bulk string"
+  #_(testing "bulk string"
     (is (str= (->resp "TEST") (decode-one (dec "$4\r\nTEST\r\n"))))
     (is (str= (->resp "TEST\r\nTEST")
               (decode-one (dec "$10\r\nTEST\r\nTEST\r\n"))))

@@ -280,6 +280,15 @@
              (assoc new-state :result (mode-result mode new-state))
              new-state)]))
 
+(defprotocol ToNioByteBuffer
+  (->nio [this]))
+
+(extend-protocol ToNioByteBuffer
+  ByteBuffer
+  (->nio [this] this)
+  ByteBuf
+  (->nio [this] (.nioBuffer this)))
+
 (defn decode
   "Raw channel will contain bytes, these are read and written to in-ch which is
    the input channel for higher-level logic."
@@ -298,7 +307,7 @@
           (let [^ByteBuf more-input (a/<! raw-ch)]
             (println "NEW INPUT:" (pr-str more-input))
             (if more-input
-              (recur (list (.nioBuffer more-input)) ;; join left over input with new input
+              (recur (->nio more-input) ;; join left over input with new input
                      state)
               (do
                 (println "Closing connection with state:" (pr-str state))
