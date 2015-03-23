@@ -1,13 +1,24 @@
 (ns redis-async.protocol-test
+  (:refer-clojure :exclude [dec])
   (:require [clojure.core.async :as a]
             [redis-async.protocol :refer :all]
             [clojure.test :refer :all]))
+
+;; utilities
+
+(defn- string->byte-buffer [string]
+  (when string
+    (byte-streams/convert string java.nio.ByteBuffer)))
+
+(defn- byte-buffer->string [byte-buffer]
+  (when byte-buffer
+    (byte-streams/convert byte-buffer String)))
 
 (defn- dec
   "Prepare a test string into a raw channel"
   [string]
   (let [raw-c (a/chan)
-        bytes (byte-streams/convert string java.nio.ByteBuffer)]
+        bytes (string->byte-buffer string)]
     (a/put! raw-c (list bytes))
     (a/close! raw-c)
     raw-c))
@@ -23,7 +34,126 @@
 (defn- str= [a b]
   (byte-streams/bytes= (:bytes a) (:bytes b)))
 
-(deftest decoding-test
+;; tests
+
+(defn- scan-for-wrapper [input byte-count]
+  (let [result (scan-for (string->byte-buffer input) byte-count)]
+    (-> result
+        (update-in [:scanned] byte-buffer->string)
+        (update-in [:input] byte-buffer->string))))
+
+(deftest scan-for-test
+  (is (= {:scanned ""
+          :input   "ABCDEF"
+          :end     true}
+         (scan-for-wrapper "ABCDEF" 0)))
+  (is (= {:scanned "ABC"
+          :input   "DEF"
+          :end     true}
+         (scan-for-wrapper "ABCDEF" 3)))
+  (is (= {:scanned "ABCDEF"
+          :input   nil
+          :end     true}
+         (scan-for-wrapper "ABCDEF" 6)))
+  (is (= {:scanned "ABCDEF"
+          :input   nil
+          :end     false}
+         (scan-for-wrapper "ABCDEF" 12))))
+
+(defn- scan-until-delimiter-wrapper [string]
+  (let [result (scan-until-delimiter (string->byte-buffer string))]
+    (-> result
+        (update-in [:scanned] byte-buffer->string)
+        (update-in [:input] byte-buffer->string))))
+
+(deftest scan-until-delimiter-test
+  (is (= {:scanned ""
+          :input   ""
+          :end     true}
+         (scan-until-delimiter-wrapper "\r\n")))
+  (is (= {:scanned ""
+          :input   nil
+          :end     false}
+         (scan-until-delimiter-wrapper "")))
+  (is (= {:scanned "ABC"
+          :input   nil
+          :end     false}
+         (scan-until-delimiter-wrapper "ABC")))
+  (is (= {:scanned "ABC"
+          :input   "\r"
+          :end     false}
+         (scan-until-delimiter-wrapper "ABC\r")))
+  (is (= {:scanned "ABC"
+          :input   ""
+          :end     true}
+         (scan-until-delimiter-wrapper "ABC\r\n")))
+  (is (= {:scanned "ABC"
+          :input   "DEF"
+          :end     true}
+         (scan-until-delimiter-wrapper "ABC\r\nDEF")))
+  (is (= {:scanned "ABC\rDEF"
+          :input   ""
+          :end     true}
+         (scan-until-delimiter-wrapper "ABC\rDEF\r\n")))
+  (is (= {:scanned "ABC\nDEF"
+          :input   nil
+          :end     false}
+         (scan-until-delimiter-wrapper "ABC\nDEF"))))
+
+(defn- process-simple-string-wrapper [current-state input]
+  (let [current-state (-> current-state
+                          (update-in [:scanned] #(map string->byte-buffer %)))
+        input         (string->byte-buffer input)
+        [s i]         (process-simple-string current-state input)]
+    [(-> s
+         (update-in [:scanned] #(map byte-buffer->string %)))
+     (byte-buffer->string i)]))
+
+(deftest process-simple-string-test
+  (is (= [{:end true :scanned ["ABC"]} ""]
+         (process-simple-string-wrapper {} "ABC\r\n")))
+  (is (= [{:end false :scanned ["ABC"]} nil]
+         (process-simple-string-wrapper {} "ABC")))
+  (is (= [{:end true :scanned ["ABC" "DEF"]} ""]
+         (process-simple-string-wrapper {:end false :scanned ["ABC"]} "DEF\r\n")))
+  (is (= [{:end true :scanned ["ABC"]} "DEF"]
+         (process-simple-string-wrapper {} "ABC\r\nDEF")))
+  (is (= [{:end false :scanned ["ABC"]} "\r"]
+         (process-simple-string-wrapper {} "ABC\r")))
+  (is (= [{:end true :scanned ["ABC" ""]} ""]
+         (process-simple-string-wrapper {:end false :scanned ["ABC"]} "\r\n"))))
+
+(defn- process-bulk-string-wrapper [current-state input]
+  (let [current-state (-> current-state
+                          (update-in [:scanned] #(map string->byte-buffer %)))
+        input         (string->byte-buffer input)
+        [s i]         (process-bulk-string current-state input)]
+    [(-> s
+         (dissoc :mode)
+         (update-in [:scanned] #(map byte-buffer->string %)))
+     (byte-buffer->string i)]))
+
+(deftest process-bulk-string-test
+  (is (= [{:scanned []
+           :size    3
+           :got     0}
+          "ABC\r\n"]
+         (process-bulk-string-wrapper {} "3\r\nABC\r\n")))
+  (is (= [{:scanned ["ABC"]
+           :end     true
+           :size    3
+           :got     3}
+          nil]
+         (process-bulk-string-wrapper {:scanned []
+                                       :size    3
+                                       :got     0}
+                                      "ABC\r\n")))
+  (is (= [{:scanned ["3"]} "\r"]
+         (process-bulk-string-wrapper {} "3\r")))
+  (is (= [{:scanned [] :size 3 :got 0} ""]
+         (process-bulk-string-wrapper {:scanned ["3"]} "\r\n"))))
+
+#_(deftest decoding-test
   (testing "simple strings"
     (is (= (->Str "TEST")
            (decode-one (dec "+TEST\r\n")))))
