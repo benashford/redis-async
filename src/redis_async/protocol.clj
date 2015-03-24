@@ -227,10 +227,14 @@
                             (assoc :end (:end result))
                             (update-in [:scanned] concat [(:scanned result)]))]
       [(if (:end current-state)
-          {:mode (:mode current-state)
-           :size (parse-int (:scanned current-state))
-           :got  0}
-          (dissoc current-state :end))
+         (let [size       (parse-int (:scanned current-state))
+               nil-string (< size 0)]
+           {:mode       (:mode current-state)
+            :size       size
+            :nil-string nil-string
+            :end        nil-string
+            :got        0})
+         (dissoc current-state :end))
        (:input result)])))
 
 (def ^:private process-fns
@@ -248,11 +252,11 @@
 (defn- result-int [{:keys [scanned] :as state}]
   (->Int (parse-int scanned)))
 
-(defn- result-bulk-string [{:keys [scanned] :as state}]
-  (println "RESULT-BULK-STRING|state:" (pr-str state))
-  (let [^ByteBuffer combined-buffer (->byte-buffer scanned)]
-    (.limit combined-buffer (- (.remaining combined-buffer) 2))
-    (->BulkStr (byte-streams/to-byte-array combined-buffer))))
+(defn- result-bulk-string [{:keys [scanned nil-string] :as state}]
+  (if nil-string
+    (->BulkStr nil)
+    (let [^ByteBuffer combined-buffer (->byte-buffer scanned)]
+      (->BulkStr (byte-streams/to-byte-array combined-buffer)))))
 
 (def ^:private result-fns
   {:str      result-simple-string
@@ -276,6 +280,8 @@
         [new-state input] (if process-fn
                             (process-fn current-state input)
                             (println "WARNING: unknown mode -" mode))]
+    (println "PROCESS STATE|new-state:" (pr-str new-state)
+             "PROCESS STATE|input:" (pr-str input))
     [input (if (:end new-state)
              (assoc new-state :result (mode-result mode new-state))
              new-state)]))
@@ -287,7 +293,9 @@
   ByteBuffer
   (->nio [this] this)
   ByteBuf
-  (->nio [this] (.nioBuffer this)))
+  (->nio [this] (.nioBuffer this))
+  nil
+  (->nio [this] nil))
 
 (defn decode
   "Raw channel will contain bytes, these are read and written to in-ch which is

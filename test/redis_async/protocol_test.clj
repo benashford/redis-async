@@ -134,15 +134,17 @@
      (byte-buffer->string i)]))
 
 (deftest process-bulk-string-test
-  (is (= [{:scanned []
-           :size    3
-           :got     0}
+  (is (= [{:scanned    []
+           :size       3
+           :end        false
+           :nil-string false
+           :got        0}
           "ABC\r\n"]
          (process-bulk-string-wrapper {} "3\r\nABC\r\n")))
-  (is (= [{:scanned ["ABC"]
-           :end     true
-           :size    3
-           :got     3}
+  (is (= [{:scanned    ["ABC"]
+           :end        true
+           :size       3
+           :got        3}
           nil]
          (process-bulk-string-wrapper {:scanned []
                                        :size    3
@@ -150,8 +152,21 @@
                                       "ABC\r\n")))
   (is (= [{:scanned ["3"]} "\r"]
          (process-bulk-string-wrapper {} "3\r")))
-  (is (= [{:scanned [] :size 3 :got 0} ""]
-         (process-bulk-string-wrapper {:scanned ["3"]} "\r\n"))))
+  (is (= [{:scanned    []
+           :size       3
+           :nil-string false
+           :end        false
+           :got        0}
+          ""]
+         (process-bulk-string-wrapper {:scanned ["3"]} "\r\n")))
+  (is (= [{:scanned    []
+           :size       -1
+           :got        0
+           :end        true
+           :nil-string true}
+          ""]
+         (process-bulk-string-wrapper {}
+                                      "-1\r\n"))))
 
 (deftest decoding-test
   (testing "simple strings"
@@ -165,11 +180,11 @@
     (is (= (->resp 100) (decode-one (dec ":100\r\n"))))
     (is (= (->resp -10) (decode-one (dec ":-10\r\n")))))
   (testing "bulk string"
-    #_(is (str= (->resp "TEST") (decode-one (dec "$4\r\nTEST\r\n"))))
-    #_(is (str= (->resp "TEST\r\nTEST")
+    (is (str= (->resp "TEST") (decode-one (dec "$4\r\nTEST\r\n"))))
+    (is (str= (->resp "TEST\r\nTEST")
               (decode-one (dec "$10\r\nTEST\r\nTEST\r\n"))))
-    #_(is (str= (->resp "") (decode-one (dec "$0\r\n\r\n"))))
-    #_(is (= (->resp nil) (decode-one (dec "$-1\r\n")))))
+    (is (str= (->resp "") (decode-one (dec "$0\r\n\r\n"))))
+    (is (= (->resp nil) (decode-one (dec "$-1\r\n")))))
   #_(testing "arrays"
     (is (= (->resp []) (io/decode resp-frame (.getBytes "*0\r\n"))))
     (is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))
