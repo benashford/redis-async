@@ -215,8 +215,9 @@
     (let [needed              (- (+ size 2) (:got current-state))
           result              (scan-for input needed)
           ^ByteBuffer scanned (:scanned result)
-          end                 (:end result)]
-      (when end (.limit scanned (- (.limit scanned) 2)))
+          end                 (:end result)
+          limit               (.limit scanned)]
+      (when end (.limit scanned (- limit 2)))
       [(-> current-state
            (assoc :end end)
            (update-in [:scanned] concat [scanned])
