@@ -159,6 +159,6 @@
   (let [cs (mapv #(echo p (str %)) (range 1000))]
     (mapv (fn [c i]
             (let [v (<!! c)]
-              (println "****" i "****" v)))
+              v))
           cs
           (range))))

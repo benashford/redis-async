@@ -344,7 +344,6 @@
             (if (not mode)
               ;; discover next mode
               (let [first-byte (.get input)
-                    _          (println "NEXT-MODE-BYTE:" first-byte)
                     next-mode  (byte->mode first-byte)]
                 (recur input (conj other-state {:mode next-mode})))
               ;; we know the mode
