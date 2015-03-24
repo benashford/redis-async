@@ -169,19 +169,30 @@
                                       "-1\r\n"))))
 
 (defn- process-ary-wrapper [current-state input]
-  (let [current-state (-> current-state
-                          (update-in [:scanned] #(map string->byte-buffer %)))
-        input         (string->byte-buffer input)
-        [s i]         (process-ary current-state input)]
-    [(-> s
-         (dissoc :mode)
-         (update-in [:scanned] #(map byte-buffer->string %)))
+  (let [input (string->byte-buffer input)
+        [s i] (process-ary current-state input)]
+    [(dissoc s :mode)
      (byte-buffer->string i)]))
 
 (deftest process-ary-test
-  #_(is (= [{:scanned []
-           :size    0}
-          ""] (process-ary-wrapper {} "0\r\n"))))
+  (is (= [{:size 0 :end true}
+          ""]
+         (process-ary-wrapper {} "0\r\n")))
+  (is (= [{:size 2 :end false}
+          "+TEST"]
+         (process-ary-wrapper {} "2\r\n+TEST")))
+  (is (= [{:scanned []
+           :size    2
+           :recur   true
+           :end     false}
+          "+TEST"]
+         (process-ary-wrapper {:scanned [] :size 2} "+TEST")))
+  (is (= [{:scanned [:a :b]
+           :size    2
+           :recur   false
+           :end     true}
+          ""]
+         (process-ary-wrapper {:scanned [:a :b] :size 2} ""))))
 
 (deftest decoding-test
   (testing "simple strings"

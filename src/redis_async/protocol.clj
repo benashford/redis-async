@@ -223,32 +223,41 @@
            (update-in [:got] + (.remaining scanned)))
        (:input result)])
     ;; size is not yet known, so needs to be determined
-    (let [result        (scan-until-delimiter input)
-          current-state (-> current-state
-                            (assoc :end (:end result))
-                            (update-in [:scanned] concat [(:scanned result)]))]
-      [(if (:end current-state)
-         (let [size       (parse-int (:scanned current-state))
+    (let [result  (scan-until-delimiter input)
+          scanned (concat (:scanned current-state) [(:scanned result)])]
+      [(if (:end result)
+         (let [size       (parse-int scanned)
                nil-string (< size 0)]
            {:mode       (:mode current-state)
             :size       size
             :nil-string nil-string
             :end        nil-string
             :got        0})
-         (dissoc current-state :end))
+         (assoc current-state :scanned scanned))
        (:input result)])))
 
 (defn process-ary [current-state input]
   (if-let [size (:size current-state)]
     ;; we know the size of the array
-    (do
-      ;
-      )
+    (let [captured-size (count (:scanned current-state))]
+      [(if (= size captured-size)
+          (assoc current-state
+                 :end true
+                 :recur false)
+          (assoc current-state
+                 :end false
+                 :recur true))
+       input])
     ;; we don't know the size of the array
-    (do
-      ;
-      )
-    ))
+    (let [result  (scan-until-delimiter input)
+          scanned (concat (:scanned current-state) [(:scanned result)])]
+      [(if (:end result)
+         (let [size (parse-int scanned)]
+           {:mode (:mode current-state)
+            :size size
+            :end  (= size 0)})
+         (assoc current-state :scanned scanned))
+       (:input result)])))
 
 (def ^:private process-fns
   {:str      process-simple-string
