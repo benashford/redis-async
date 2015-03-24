@@ -168,6 +168,21 @@
          (process-bulk-string-wrapper {}
                                       "-1\r\n"))))
 
+(defn- process-ary-wrapper [current-state input]
+  (let [current-state (-> current-state
+                          (update-in [:scanned] #(map string->byte-buffer %)))
+        input         (string->byte-buffer input)
+        [s i]         (process-ary current-state input)]
+    [(-> s
+         (dissoc :mode)
+         (update-in [:scanned] #(map byte-buffer->string %)))
+     (byte-buffer->string i)]))
+
+(deftest process-ary-test
+  #_(is (= [{:scanned []
+           :size    0}
+          ""] (process-ary-wrapper {} "0\r\n"))))
+
 (deftest decoding-test
   (testing "simple strings"
     (is (= (->Str "TEST")
@@ -185,16 +200,16 @@
               (decode-one (dec "$10\r\nTEST\r\nTEST\r\n"))))
     (is (str= (->resp "") (decode-one (dec "$0\r\n\r\n"))))
     (is (= (->resp nil) (decode-one (dec "$-1\r\n")))))
-  #_(testing "arrays"
-    (is (= (->resp []) (io/decode resp-frame (.getBytes "*0\r\n"))))
-    (is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))
-    (is (= (->resp [(->Str "TEST")])
+  (testing "arrays"
+    #_(is (= (->resp []) (decode-one (dec "*0\r\n"))))
+    #_(is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))
+    #_(is (= (->resp [(->Str "TEST")])
            (io/decode resp-frame (.getBytes "*1\r\n+TEST\r\n"))))
-    (is (= (->resp ["TEST"]) (io/decode resp-frame (.getBytes "*1\r\n$4\r\nTEST\r\n"))))
-    (is (= (->resp [nil]) (io/decode resp-frame (.getBytes "*1\r\n$-1\r\n"))))
-    (is (= (->resp [1 ["TEST"]])
+    #_(is (= (->resp ["TEST"]) (io/decode resp-frame (.getBytes "*1\r\n$4\r\nTEST\r\n"))))
+    #_(is (= (->resp [nil]) (io/decode resp-frame (.getBytes "*1\r\n$-1\r\n"))))
+    #_(is (= (->resp [1 ["TEST"]])
            (io/decode resp-frame (.getBytes "*2\r\n:1\r\n*1\r\n$4\r\nTEST\r\n"))))
-    (is (= (->resp [1 "TEST\r\nTEST" nil (->Str "TEST")])
+    #_(is (= (->resp [1 "TEST\r\nTEST" nil (->Str "TEST")])
            (io/decode resp-frame
                       (.getBytes "*4\r\n:1\r\n$10\r\nTEST\r\nTEST\r\n$-1\r\n+TEST\r\n"))))))
 

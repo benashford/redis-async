@@ -119,7 +119,8 @@
   {43 :str
    45 :err
    58 :int
-   36 :bulk-str})
+   36 :bulk-str
+   42 :ary})
 
 (def ^:private first-delimiter 13)
 (def ^:private second-delimiter 10)
@@ -237,11 +238,24 @@
          (dissoc current-state :end))
        (:input result)])))
 
+(defn process-ary [current-state input]
+  (if-let [size (:size current-state)]
+    ;; we know the size of the array
+    (do
+      ;
+      )
+    ;; we don't know the size of the array
+    (do
+      ;
+      )
+    ))
+
 (def ^:private process-fns
   {:str      process-simple-string
    :err      process-error
    :int      process-int
-   :bulk-str process-bulk-string})
+   :bulk-str process-bulk-string
+   :ary      process-ary})
 
 (defn- result-simple-string [{:keys [scanned] :as state}]
   (->Str (byte-streams/convert scanned String)))
@@ -321,6 +335,7 @@
             (if (not mode)
               ;; discover next mode
               (let [first-byte (.get input)
+                    _          (println "NEXT-MODE-BYTE:" first-byte)
                     next-mode  (byte->mode first-byte)]
                 (recur input (conj other-state {:mode next-mode})))
               ;; we know the mode
