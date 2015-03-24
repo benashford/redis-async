@@ -274,14 +274,10 @@
   "Process the current state, as much as possible, in a non-blocking manner.
    Returns the new state and any left-over input."
   [{:keys [mode] :as current-state} input]
-  (println "PROCESS STATE|current-state:" (pr-str current-state)
-           "PROCESS STATE|input:" (pr-str input))
   (let [process-fn        (process-fns mode)
         [new-state input] (if process-fn
                             (process-fn current-state input)
                             (println "WARNING: unknown mode -" mode))]
-    (println "PROCESS STATE|new-state:" (pr-str new-state)
-             "PROCESS STATE|input:" (pr-str input))
     [input (if (:end new-state)
              (assoc new-state :result (mode-result mode new-state))
              new-state)]))
@@ -304,19 +300,14 @@
   (a/go
     (loop [^ByteBuffer input nil
            state             '({})]
-      ;; Debugging - to be deleted
-      (println "LOOP STATE:")
-      (clojure.pprint/pprint {:input input :state state})
       (let [readable-bytes (if input
                              (.remaining input)
                              0)]
         ;; Do we have any bytes to read
         (if (< readable-bytes 2)
           (do
-            (println "WAITING FOR NEW INPUT")
             (let [more-input             (a/<! raw-ch)
                   ^ByteBuffer more-input (->nio more-input)]
-              (println "NEW INPUT:" (pr-str more-input))
               (if more-input
                 (recur (if input
                          (->byte-buffer [input more-input])
@@ -334,12 +325,10 @@
                 (recur input (conj other-state {:mode next-mode})))
               ;; we know the mode
               (let [[input current-state] (process-state current-state input)]
-                (println "PROCESSED STATE|input:" (pr-str input))
                 (if (:end current-state)
                   (let [result (:result current-state)]
                     (if (empty? other-state)
                       (do
-                        (println "--RESP-->" (pr-str result))
                         (a/>! in-ch result)
                         (recur input other-state))
                       (recur input (let [[next-state remaining-states] other-state]
