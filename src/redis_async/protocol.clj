@@ -29,6 +29,9 @@
 (defn ->byte-buffer [thing]
   (byte-streams/convert thing java.nio.ByteBuffer))
 
+(defn ->string [bb]
+  (byte-streams/convert bb String))
+
 ;; Utility constants
 
 (def ^:private deliminator #(->byte-buffer "\r\n"))
@@ -216,18 +219,29 @@
           result              (scan-for input needed)
           ^ByteBuffer scanned (:scanned result)
           end                 (:end result)
-          limit               (.limit scanned)]
-      (assert (>= limit 2)
-              (format "Limit should be greater than or equal to 2: (scanned: %s, current-state: %s, input: %s"
-                      scanned
-                      (pr-str current-state)
-                      input))
-      (when end (.limit scanned (- limit 2)))
-      [(-> current-state
-           (assoc :end end)
-           (update-in [:scanned] concat [scanned])
-           (update-in [:got] + (.remaining scanned)))
-       (:input result)])
+          limit               (.limit scanned)
+          cut-off             (- limit 2)]
+      (if end
+        [(if (< cut-off 0)
+            ;; the final part is smaller than the amount we need to lose
+            (let [^ByteBuffer last-scanned (last (:scanned current-state))]
+              (.limit last-scanned (+ (.limit last-scanned) cut-off))
+              (-> current-state
+                  (assoc :end true
+                         :got (:size current-state))))
+            ;; the final part is bigger or equal
+            (do
+              (.limit scanned cut-off)
+              (-> current-state
+                  (assoc :end true)
+                  (update-in [:scanned] concat [scanned])
+                  (update-in [:got] + (.remaining scanned)))))
+         (:input result)]
+        [(-> current-state
+             (assoc :end end)
+             (update-in [:scanned] concat [scanned])
+             (update-in [:got] + (.remaining scanned)))
+         (:input result)]))
     ;; size is not yet known, so needs to be determined
     (let [result  (scan-until-delimiter input)
           scanned (concat (:scanned current-state) [(:scanned result)])]
@@ -302,7 +316,8 @@
 (defn- process-state
   "Process the current state, as much as possible, in a non-blocking manner.
    Returns the new state and any left-over input."
-  [{:keys [mode] :as current-state} input]
+  [{:keys [mode] :as current-state} ^ByteBuffer input]
+  {:pre [(> (.remaining input) 1)]}
   (let [process-fn        (process-fns mode)
         [new-state input] (if process-fn
                             (process-fn current-state input)
