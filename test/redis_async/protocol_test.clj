@@ -175,10 +175,14 @@
      (byte-buffer->string i)]))
 
 (deftest process-ary-test
-  (is (= [{:size 0 :end true}
+  (is (= [{:size    0
+           :scanned []
+           :end     true}
           ""]
          (process-ary-wrapper {} "0\r\n")))
-  (is (= [{:size 2 :end false}
+  (is (= [{:size    2
+           :scanned []
+           :end     false}
           "+TEST"]
          (process-ary-wrapper {} "2\r\n+TEST")))
   (is (= [{:scanned []
@@ -212,7 +216,7 @@
     (is (str= (->resp "") (decode-one (dec "$0\r\n\r\n"))))
     (is (= (->resp nil) (decode-one (dec "$-1\r\n")))))
   (testing "arrays"
-    #_(is (= (->resp []) (decode-one (dec "*0\r\n"))))
+    (is (= (->resp []) (decode-one (dec "*0\r\n"))))
     #_(is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))
     #_(is (= (->resp [(->Str "TEST")])
            (io/decode resp-frame (.getBytes "*1\r\n+TEST\r\n"))))

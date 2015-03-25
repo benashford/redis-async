@@ -273,9 +273,10 @@
           scanned (concat (:scanned current-state) [(:scanned result)])]
       [(if (:end result)
          (let [size (parse-int scanned)]
-           {:mode (:mode current-state)
-            :size size
-            :end  (= size 0)})
+           {:mode    (:mode current-state)
+            :size    size
+            :scanned []
+            :end     (= size 0)})
          (assoc current-state :scanned scanned))
        (:input result)])))
 
@@ -301,11 +302,15 @@
     (let [^ByteBuffer combined-buffer (->byte-buffer scanned)]
       (->BulkStr (byte-streams/to-byte-array combined-buffer)))))
 
+(defn- result-ary [{:keys [scanned] :as state}]
+  (->Ary scanned))
+
 (def ^:private result-fns
   {:str      result-simple-string
    :err      result-error
    :int      result-int
-   :bulk-str result-bulk-string})
+   :bulk-str result-bulk-string
+   :ary      result-ary})
 
 (defn- mode-result [mode state]
   (let [result-fn (result-fns mode)]
