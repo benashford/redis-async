@@ -198,6 +198,13 @@
           ""]
          (process-ary-wrapper {:scanned [:a :b] :size 2} ""))))
 
+(deftest process-state-test
+  (let [[input new-state] (process-state [{:mode :ary
+                                           :size 3}]
+                                         (string->byte-buffer "$4\r\nTEST\r\n"))]
+    (is (= "$4\r\nTEST\r\n" (byte-buffer->string input)))
+    (is (= [{} {:end false :mode :ary :size 3}] new-state))))
+
 (deftest decoding-test
   (testing "simple strings"
     (is (= (->Str "TEST")
@@ -217,7 +224,7 @@
     (is (= (->resp nil) (decode-one (dec "$-1\r\n")))))
   (testing "arrays"
     (is (= (->resp []) (decode-one (dec "*0\r\n"))))
-    #_(is (= (->resp [1]) (io/decode resp-frame (.getBytes "*1\r\n:1\r\n"))))
+    #_(is (= (->resp [1]) (decode-one (dec "*1\r\n:1\r\n"))))
     #_(is (= (->resp [(->Str "TEST")])
            (io/decode resp-frame (.getBytes "*1\r\n+TEST\r\n"))))
     #_(is (= (->resp ["TEST"]) (io/decode resp-frame (.getBytes "*1\r\n$4\r\nTEST\r\n"))))

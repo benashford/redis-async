@@ -149,6 +149,7 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
+1. Decode loop needs refactoring
 2. Re-enable disabled tests before merging into master
 1. Identify performance bottlenecks/trade-offs.
 1. Performance testing.

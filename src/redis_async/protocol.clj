@@ -318,18 +318,30 @@
       (result-fn state)
       (println "WARNING: unknown mode -" mode))))
 
-(defn- process-state
+(defn process-state
   "Process the current state, as much as possible, in a non-blocking manner.
    Returns the new state and any left-over input."
-  [{:keys [mode] :as current-state} ^ByteBuffer input]
+  [[{:keys [mode] :as current-state} & other-state] ^ByteBuffer input]
+  (println "CURRENT STATE:" (pr-str current-state))
   {:pre [(> (.remaining input) 1)]}
   (let [process-fn        (process-fns mode)
         [new-state input] (if process-fn
                             (process-fn current-state input)
-                            (println "WARNING: unknown mode -" mode))]
-    [input (if (:end new-state)
-             (assoc new-state :result (mode-result mode new-state))
-             new-state)]))
+                            (println "WARNING: unknown mode -" mode))
+        recur?            (:recur new-state)
+        new-state         (cond
+                           (:end new-state)
+                           (assoc new-state :result (mode-result mode new-state))
+
+                           recur?
+                           (dissoc new-state :recur)
+
+                           :else
+                           new-state)
+        state             (if recur?
+                            (list* {} new-state other-state)
+                            (cons new-state other-state))]
+    [input state]))
 
 (defprotocol ToNioByteBuffer
   (->nio [this]))
@@ -365,25 +377,29 @@
                 (do
                   (println "Closing connection with state:" (pr-str state))
                   (a/close! in-ch)))))
-          (let [[current-state & other-state] state
-                mode                          (:mode current-state)]
+          (let [mode (:mode (first state))]
             (if (not mode)
               ;; discover next mode
               (let [first-byte (.get input)
                     next-mode  (byte->mode first-byte)]
-                (recur input (conj other-state {:mode next-mode})))
+                (recur input (conj (next state) {:mode next-mode})))
               ;; we know the mode
-              (let [[input current-state] (process-state current-state input)]
+              (let [[input
+                     [current-state & other-state :as state]] (process-state state input)]
                 (if (:end current-state)
                   (let [result (:result current-state)]
                     (if (empty? other-state)
                       (do
                         (a/>! in-ch result)
                         (recur input other-state))
-                      (recur input (let [[next-state remaining-states] other-state]
-                                     (cons (update-in next-state [:scanned] conj result)
-                                           remaining-states)))))
-                  (recur input (conj other-state current-state)))))))))))
+                      (let [[next-state
+                             remaining-states] other-state
+                             state             (cons (update-in next-state
+                                                                [:scanned]
+                                                                conj result)
+                                                     remaining-states)]
+                        (recur input state))))
+                  (recur input state))))))))))
 
 (defn encode-one [frame]
   (->raw frame))
