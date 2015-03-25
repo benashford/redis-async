@@ -217,6 +217,11 @@
           ^ByteBuffer scanned (:scanned result)
           end                 (:end result)
           limit               (.limit scanned)]
+      (assert (>= limit 2)
+              (format "Limit should be greater than or equal to 2: (scanned: %s, current-state: %s, input: %s"
+                      scanned
+                      (pr-str current-state)
+                      input))
       (when end (.limit scanned (- limit 2)))
       [(-> current-state
            (assoc :end end)
