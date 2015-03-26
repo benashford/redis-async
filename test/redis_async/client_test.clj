@@ -17,7 +17,7 @@
        protocol/str->bytes
        protocol/->Err))
 
-#_(deftest <!-test
+(deftest <!-test
   (is (nil? (a/<!! (a/go (client/<! (make-test-channel nil))))))
   (is (= 1 (a/<!! (a/go (client/<! (make-test-channel 1))))))
   (testing "error handling"
@@ -29,7 +29,7 @@
                             (select-keys (ex-data e)
                                          [:type :msg])))))))))
 
-#_(deftest <!!-test
+(deftest <!!-test
   (is (nil? (client/<!! (make-test-channel nil))))
   (is (= 1 (client/<!! (make-test-channel 1))))
   (testing "error handling"
@@ -41,31 +41,34 @@
                (select-keys (ex-data e)
                             [:type :msg])))))))
 
-#_(deftest faf-test
+(deftest faf-test
   (is (nil? (a/<!! (client/faf (make-test-channel 1 2 3)))))
   (is (nil? (a/<!! (client/faf (make-test-channel 1 (make-error "TEST ERROR")))))))
 
-#_(deftest wait!-test
+(deftest wait!-test
   (is (nil? (a/<!! (a/go (client/wait! (make-test-channel 1))))))
   (testing "error handling"
-    (is (= {:type :redis
-            :msgs ["ERR A" "ERR B"]}
-           (a/<!! (a/go (try
-                          (client/wait! (make-test-channel (make-error "ERR A")
-                                                           (make-error "ERR B")))
-                          (catch clojure.lang.ExceptionInfo e
-                            (ex-data e)))))))))
+    (let [result (a/<!! (a/go
+                          (try
+                            (client/wait! (make-test-channel (make-error "ERR A")
+                                                             (make-error "ERR B")))
+                            (catch clojure.lang.ExceptionInfo e
+                              (ex-data e)))))]
+      (is (= :redis (:type result)))
+      (is (= ["ERR A" "ERR B"]
+             (map #(:msg (ex-data %)) (:msgs result)))))))
 
-#_(deftest wait!!-test
+(deftest wait!!-test
   (is (nil? (client/wait!! (make-test-channel 1))))
   (testing "error handling"
-    (is (= {:type :redis
-            :msgs ["ERR A" "ERR B"]}
-           (try
-             (client/wait!! (make-test-channel (make-error "ERR A")
-                                               (make-error "ERR B")))
-             (catch clojure.lang.ExceptionInfo e
-               (ex-data e)))))))
+    (let [result (try
+                   (client/wait!! (make-test-channel (make-error "ERR A")
+                                                     (make-error "ERR B")))
+                   (catch clojure.lang.ExceptionInfo e
+                     (ex-data e)))]
+      (is (= :redis (:type result)))
+      (is (= ["ERR A" "ERR B"]
+             (map #(:msg (ex-data %)) (:msgs result)))))))
 
 ;; Testing commands
 
@@ -80,7 +83,7 @@
   []
   (client/wait!! (client/set *redis-pool* "TEST-STRING" "STRING-VALUE")))
 
-#_(defn- redis-connect [f]
+(defn- redis-connect [f]
   (binding [*redis-pool* (core/make-pool {})]
     (is-ok (client/<!! (client/select *redis-pool* "1")))
     (is-ok (client/<!! (client/flushdb *redis-pool*)))
@@ -94,9 +97,9 @@
 (defn- get-with-redis [f & params]
   (client/<!! (apply with-redis f params)))
 
-#_(use-fixtures :once redis-connect)
+(use-fixtures :once redis-connect)
 
-#_(deftest keys-test
+(deftest keys-test
   ;; Test a sample of functions of Redis commands in the 'KEYS' category.
   (testing "DEL"
     (is-ok (get-with-redis client/set "TEST-KEY" "TEST-VALUE"))
@@ -137,7 +140,7 @@
       (client/faf (with-redis client/sadd "SORT-TEST" d)))
     (is (= ["A" "B" "W" "Z"] (get-with-redis client/sort "SORT-TEST" :alpha)))))
 
-#_(deftest strings-test
+(deftest strings-test
   (testing "GET, SET, INCR, INCRBY, DECR, DECRBY"
     (client/wait!! (with-redis client/set "STEST" 1))
     (client/wait!! (with-redis client/incr "STEST"))
