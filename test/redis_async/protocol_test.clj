@@ -224,16 +224,16 @@
     (is (= (->resp nil) (decode-one (dec "$-1\r\n")))))
   (testing "arrays"
     (is (= (->resp []) (decode-one (dec "*0\r\n"))))
-    #_(is (= (->resp [1]) (decode-one (dec "*1\r\n:1\r\n"))))
-    #_(is (= (->resp [(->Str "TEST")])
-           (io/decode resp-frame (.getBytes "*1\r\n+TEST\r\n"))))
-    #_(is (= (->resp ["TEST"]) (io/decode resp-frame (.getBytes "*1\r\n$4\r\nTEST\r\n"))))
-    #_(is (= (->resp [nil]) (io/decode resp-frame (.getBytes "*1\r\n$-1\r\n"))))
-    #_(is (= (->resp [1 ["TEST"]])
-           (io/decode resp-frame (.getBytes "*2\r\n:1\r\n*1\r\n$4\r\nTEST\r\n"))))
-    #_(is (= (->resp [1 "TEST\r\nTEST" nil (->Str "TEST")])
-           (io/decode resp-frame
-                      (.getBytes "*4\r\n:1\r\n$10\r\nTEST\r\nTEST\r\n$-1\r\n+TEST\r\n"))))))
+    (is (= (->resp [1]) (decode-one (dec "*1\r\n:1\r\n"))))
+    (is (= (->resp [(->Str "TEST")])
+           (decode-one (dec "*1\r\n+TEST\r\n"))))
+    (is (= ["TEST"] (->clj (decode-one (dec "*1\r\n$4\r\nTEST\r\n")))))
+    (is (= (->resp [nil]) (decode-one (dec "*1\r\n$-1\r\n"))))
+    (is (= [1 ["TEST"]]
+           (->clj (decode-one (dec "*2\r\n:1\r\n*1\r\n$4\r\nTEST\r\n")))))
+    (is (= [1 "TEST\r\nTEST" nil "TEST"]
+           (->clj (decode-one
+                   (dec "*4\r\n:1\r\n$10\r\nTEST\r\nTEST\r\n$-1\r\n+TEST\r\n")))))))
 
 (defn- enc [test-value]
   (-> test-value ->resp encode-one (byte-streams/convert String)))

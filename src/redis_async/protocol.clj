@@ -322,13 +322,12 @@
   "Process the current state, as much as possible, in a non-blocking manner.
    Returns the new state and any left-over input."
   [[{:keys [mode] :as current-state} & other-state] ^ByteBuffer input]
-  (println "CURRENT STATE:" (pr-str current-state))
-  {:pre [(> (.remaining input) 1)]}
   (let [process-fn        (process-fns mode)
         [new-state input] (if process-fn
                             (process-fn current-state input)
                             (println "WARNING: unknown mode -" mode))
         recur?            (:recur new-state)
+        end?              (:end new-state)
         new-state         (cond
                            (:end new-state)
                            (assoc new-state :result (mode-result mode new-state))
@@ -338,10 +337,16 @@
 
                            :else
                            new-state)
+        top-state?        (empty? other-state)
         state             (if recur?
                             (list* {} new-state other-state)
                             (cons new-state other-state))]
-    [input state]))
+    (if (and end? (not top-state?))
+      (let [[first-state next-state & remaining-states] state]
+        (recur (cons (update-in next-state [:scanned] conj (:result first-state))
+                     remaining-states)
+               input))
+      [input state])))
 
 (defprotocol ToNioByteBuffer
   (->nio [this]))
@@ -388,17 +393,8 @@
                      [current-state & other-state :as state]] (process-state state input)]
                 (if (:end current-state)
                   (let [result (:result current-state)]
-                    (if (empty? other-state)
-                      (do
-                        (a/>! in-ch result)
-                        (recur input other-state))
-                      (let [[next-state
-                             remaining-states] other-state
-                             state             (cons (update-in next-state
-                                                                [:scanned]
-                                                                conj result)
-                                                     remaining-states)]
-                        (recur input state))))
+                    (a/>! in-ch result)
+                    (recur input other-state))
                   (recur input state))))))))))
 
 (defn encode-one [frame]
