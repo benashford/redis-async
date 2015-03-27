@@ -149,21 +149,19 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Local copy of Redis commands
-2. Use Leiningen profiles to enable benchmarking configuration, to keep seperate from usual code.
-3. Much better logging/error handling.
-2. Document commands that don't make sense in an async context.
-3. The 'monitor' command.
-4. Document the 'monitor' command.
-5. Pub/sub commands.
-6. Transaction commands.
-7. Release 0.1.0 version.
-1. Performance testing.
-7. Test coverage.
-10. Redis authentication.
-11. Scripting support.
-12. Create Clojure 1.7 version using transducers
-13. Split pipelined commands into multiple packages when exceeding limits, and/or add a buffered channel of the right size.
+1. Use Leiningen profiles to enable benchmarking configuration, to keep seperate from usual code.
+2. Much better logging/error handling.
+3. Document commands that don't make sense in an async context.
+4. The 'monitor' command.
+5. Document the 'monitor' command.
+6. Pub/sub commands.
+7. Transaction commands.
+8. Release 0.1.0 version.
+9. Performance testing.
+10. Test coverage.
+11. Redis authentication.
+12. Scripting support.
+13. Create Clojure 1.7 version using transducers
 
 ## License
 

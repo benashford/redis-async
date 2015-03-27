@@ -14,7 +14,8 @@
 
 (ns redis-async.client
   (:refer-clojure :exclude [time sync keys sort type get set eval])
-  (:require [clojure.string :as s]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as s]
             [clojure.core.async :as a]
             [cheshire.core :as json]
             [redis-async.core :refer :all]
@@ -109,7 +110,8 @@
   #{"monitor"})
 
 (defn- load-commands-meta []
-  (->> "https://raw.githubusercontent.com/antirez/redis-doc/master/commands.json"
+  (->> "commands.json"
+       io/resource
        slurp
        json/decode))
 
