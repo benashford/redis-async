@@ -149,8 +149,7 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Performance testing.
-2. Local copy of Redis commands
+1. Local copy of Redis commands
 2. Use Leiningen profiles to enable benchmarking configuration, to keep seperate from usual code.
 3. Much better logging/error handling.
 2. Document commands that don't make sense in an async context.
@@ -159,6 +158,7 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 5. Pub/sub commands.
 6. Transaction commands.
 7. Release 0.1.0 version.
+1. Performance testing.
 7. Test coverage.
 10. Redis authentication.
 11. Scripting support.
