@@ -8,6 +8,7 @@
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [aleph "0.4.0-beta3"]
                  [byte-streams "0.2.0-alpha8"]
-                 [cheshire "5.4.0"]
-                 [criterium "0.4.3"]]
-  :jvm-opts ^:replace [])
+                 [cheshire "5.4.0"]]
+  :profiles {:dev {:dependencies [[criterium "0.4.3"]]
+                   :jvm-opts ^:replace []}}
+  :aliases {"bench-repl" ["with-profile" "benchmark" "repl" ":headless"]})

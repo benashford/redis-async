@@ -149,7 +149,6 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Use Leiningen profiles to enable benchmarking configuration, to keep seperate from usual code.
 2. Much better logging/error handling.
 3. Document commands that don't make sense in an async context.
 4. The 'monitor' command.
