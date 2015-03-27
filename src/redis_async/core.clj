@@ -111,11 +111,10 @@
                 (a/close! ret-c)
                 (recur (a/<! ret-c-c))))))
         (catch Throwable t
-          (println "ERROR:" t)
-          (.printStackTrace t)
           (drain cmd-ch t)
           (stop-connection con)
-          (a/close! cmd-ch))))))
+          (a/close! cmd-ch)
+          t)))))
 
 (defrecord Connection [pool connection cmd-ch in-c]
   ConnectionLifecycle

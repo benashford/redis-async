@@ -147,7 +147,6 @@
     (let [command-data (clojure.walk/keywordize-keys command-data)
           summary      (command-data :summary)
           args         (command-data :arguments)]
-      (println "Function:" fn-name)
       (emit-client-fn fn-name summary))))
 
 (let [cmd-meta (load-commands-meta)

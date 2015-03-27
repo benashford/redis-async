@@ -149,18 +149,16 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-2. Much better logging/error handling.
-3. Document commands that don't make sense in an async context.
-4. The 'monitor' command.
-5. Document the 'monitor' command.
-6. Pub/sub commands.
-7. Transaction commands.
-8. Release 0.1.0 version.
-9. Performance testing.
-10. Test coverage.
-11. Redis authentication.
-12. Scripting support.
-13. Create Clojure 1.7 version using transducers
+1. Implement and document the 'monitor' command.
+2. Document commands that don't make sense in an async context.
+3. Pub/sub commands.
+4. Transaction commands.
+5. Release 0.1.0 version.
+6. Performance testing.
+7. Test coverage.
+8. Redis authentication.
+9. Scripting support.
+10. Create Clojure 1.7 version using transducers
 
 ## License
 

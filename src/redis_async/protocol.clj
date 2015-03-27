@@ -316,7 +316,7 @@
   (let [result-fn (result-fns mode)]
     (if result-fn
       (result-fn state)
-      (println "WARNING: unknown mode -" mode))))
+      (throw (ex-info "Mode has no result-fn" {:mode mode :state state})))))
 
 (defn process-state
   "Process the current state, as much as possible, in a non-blocking manner.
@@ -325,7 +325,11 @@
   (let [process-fn        (process-fns mode)
         [new-state input] (if process-fn
                             (process-fn current-state input)
-                            (println "WARNING: unknown mode -" mode))
+                            (throw (ex-info "Mode has no process-fn"
+                                            {:mode  mode
+                                             :state (cons current-state
+                                                          other-state)
+                                             :input input})))
         recur?            (:recur new-state)
         end?              (:end new-state)
         new-state         (cond
@@ -380,8 +384,9 @@
                          more-input) ;; join left over input with new input
                        state)
                 (do
-                  (println "Closing connection with state:" (pr-str state))
-                  (a/close! in-ch)))))
+                  (a/close! in-ch)
+                  (when-not (empty? state)
+                    (throw (ex-info "Closing with non-empty state:" {:state state})))))))
           (let [mode (:mode (first state))]
             (if (not mode)
               ;; discover next mode
