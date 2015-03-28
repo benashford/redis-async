@@ -51,7 +51,7 @@ Each Redis command has an equivalent function in `redis-async.client`.  These ca
 
 ### The connection pool
 
-TODO: explain this bit
+Rather than a traditional connection pool as a means of allowing multiple threads access to the database via multiple connections, this library will multiplex Redis commands from many threads into a single queue (pipelining if possible).  However some commands require a dedicated connecton, these are explained in more detail below.
 
 ### Client functions
 
@@ -61,7 +61,11 @@ Each function that implements a Redis command returns a channel, from which the 
 
 The vast majority of Redis commands are simple request/response commands.  There are a number however with behave differently, in that they either: a) return an arbitrary/infinite number of results, or b) are blocking.  These are implemented seperately with slightly different semantics.
 
-TODO: details.
+##### `MONITOR`
+
+The [`monitor`](http://redis.io/commands/monitor) command will return an infinite (until you tell it to stop) sequence of all activity on a Redis server.
+
+The monitor function returns a channel, if call succeeds this yields a vector containing two channels.  The first channel contains each monitored command, on a line-by-line basis; the second is used to stop monitoring, closing this channel will stop.
 
 ### Other client functions
 
@@ -149,16 +153,15 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Implement and document the 'monitor' command.
-2. Document commands that don't make sense in an async context.
-3. Pub/sub commands.
-4. Transaction commands.
-5. Release 0.1.0 version.
-6. Performance testing.
-7. Test coverage.
-8. Redis authentication.
-9. Scripting support.
-10. Create Clojure 1.7 version using transducers
+1. Document commands that don't make sense in an async context.
+2. Pub/sub commands.
+3. Transaction commands.
+4. Release 0.1.0 version.
+5. Performance testing.
+6. Test coverage.
+7. Redis authentication.
+8. Scripting support.
+9. Create Clojure 1.7 version using transducers
 
 ## License
 

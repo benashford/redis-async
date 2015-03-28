@@ -98,13 +98,12 @@
 
 (use-fixtures :once redis-connect)
 
-#_(deftest monitor-test
+(deftest monitor-test
   (client/wait!! (with-redis client/set "T1" "D1"))
   (client/wait!! (with-redis client/set "T2" "D2"))
   (let [[m-ch close-ch] (a/<!! (with-redis client/monitor))]
     (is (= "D1" (get-with-redis client/get "T1")))
     (is (= "D2" (get-with-redis client/get "T2")))
-    (client/<!! m-ch)
     (is (.contains (client/<!! m-ch) "GET"))
     (is (.contains (client/<!! m-ch) "T2"))
     (a/close! close-ch))
