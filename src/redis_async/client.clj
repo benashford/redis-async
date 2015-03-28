@@ -38,11 +38,6 @@
 (defmacro <!! [expr]
   `(read-value (a/<!! ~expr)))
 
-(defn- is-error? [v]
-  (let [klass (class v)]
-    (or (= klass redis_async.protocol.Err)
-        (= klass redis_async.core.ClientErr))))
-
 (defn- is-str? [v]
   (or (= (class v) redis_async.protocol.Str)
       (= (class v) redis_async.protocol.BulkStr)))
@@ -79,30 +74,31 @@
 
 (defn monitor [pool]
   (let [con     (pool/borrow-connection pool)
-        cmds    (a/chan)
         close-c (a/chan)
+        ret-c   (a/chan)
         cmd-ch  (:cmd-ch con)
         in-c    (:in-c con)
-        ret-c   (a/chan)
-        tmp-c   (a/chan)]
+        quit    (fn []
+                  (a/close! ret-c)
+                  (a/put! cmd-ch [(protocol/->resp ["QUIT"]) (a/chan 1)])
+                  (pool/close-connection pool con))]
     (a/go
-      (a/>! cmd-ch {:ret-c tmp-c
-                    :cmds  cmds})
-      (a/>! cmds (protocol/->resp ["MONITOR"]))
-      (let [ok (a/<! tmp-c)]
+      (let [ok (a/<! (send! cmd-ch (protocol/->resp ["MONITOR"])))]
         (if (= (protocol/->clj ok) "OK")
-          (loop [[v _] (a/alts! [in-c close-c])]
-            (if-not v
-              (do
-                (a/close! ret-c)
-                (pool/return-connection pool con))
-              (do
-                (a/>! ret-c v)
-                (recur (a/alts! [in-c close-c])))))
+          (do
+            (a/go-loop [[v _] (a/alts! [in-c close-c])]
+              (if-not v
+                (do
+                  (a/close! ret-c)
+                  (pool/return-connection pool con))
+                (do
+                  (a/>! ret-c v)
+                  (recur (a/alts! [in-c close-c])))))
+            [ret-c close-c])
           (do
             (a/close! ret-c)
-            (pool/return-connection pool con)))))
-    [ret-c close-c]))
+            (pool/return-connection pool con)
+            nil))))))
 
 ;; Commands
 

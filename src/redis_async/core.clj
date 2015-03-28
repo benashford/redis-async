@@ -25,7 +25,7 @@
    :port 6379})
 
 (defprotocol ConnectionLifecycle
-  (start-connection [this])
+  (start-connection [this redis])
   (stop-connection [this]))
 
 (defrecord ClientErr [t]
@@ -116,14 +116,47 @@
           (a/close! cmd-ch)
           t)))))
 
+(defn is-error? [v]
+  (let [klass (class v)]
+    (or (= klass redis_async.protocol.Err)
+        (= klass redis_async.core.ClientErr))))
+
+(defn send!
+  "Send a RESP object to the channel, returns a channel from which the result
+   can be read."
+  [cmd-ch full-cmd]
+  (let [ret-c (a/chan 1)]
+    (if (a/put! cmd-ch [full-cmd ret-c])
+      ret-c)))
+
+(defn- authenticate
+  "If authentication details are specified, send them before anything else on
+   this channel."
+  [cmd-ch in-c redis]
+  (let [password-c (when-let [password (:password redis)]
+                     (send! cmd-ch (protocol/->resp ["AUTH" password])))
+        select-c   (when-let [db (:db redis)]
+                     (send! cmd-ch (protocol/->resp ["SELECT" (str db)])))]
+    (when password-c
+      (a/take! password-c
+               (fn [response]
+                 (when (is-error? response)
+                   (a/put! in-c response)))))
+    (when select-c
+      (a/take! select-c
+               (fn [response]
+                 (when (is-error? response)
+                   (a/put! in-c response)))))))
+
 (defrecord Connection [pool connection cmd-ch in-c]
   ConnectionLifecycle
-  (start-connection [this]
+  (start-connection [this redis]
     (let [cmd-ch   (a/chan)
           in-raw-c (a/chan pipelineable-size)
           in-c     (a/chan pipelineable-size)]
       (stream/connect connection in-raw-c)
       (protocol/decode in-raw-c in-c)
+      (authenticate cmd-ch in-c redis)
       (let [new-con (->Connection pool connection cmd-ch in-c)]
         (process-stream new-con)
         new-con)))
@@ -146,17 +179,16 @@
   (pool/make-pool (reify pool/ConnectionFactory
                     (test-con [this con] true)
                     (new-con [this pool]
-                      (->> (make-connection pool redis)
-                           start-connection))
+                      (-> (make-connection pool redis)
+                          (start-connection redis)))
                     (close-con [this con] (stop-connection con)))))
 
 (defn close-pool [pool]
   (pool/close-pool pool))
 
 (defn send-cmd [pool command params]
-  (let [full-cmd (protocol/->resp (concat command params))]
-    (let [cmd-ch (:cmd-ch (pool/get-connection pool))
-          ret-c  (a/chan 1)]
-      (if (a/put! cmd-ch [full-cmd ret-c])
-        ret-c
-        (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch}))))))
+  (let [cmd-ch (pool/get-connection pool)]
+    (if-let [ret-c (send! (:cmd-ch cmd-ch)
+                          (protocol/->resp (concat command params)))]
+      ret-c
+      (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch})))))

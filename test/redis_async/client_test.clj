@@ -84,8 +84,7 @@
   (client/wait!! (client/set *redis-pool* "TEST-STRING" "STRING-VALUE")))
 
 (defn- redis-connect [f]
-  (binding [*redis-pool* (core/make-pool {})]
-    (is-ok (client/<!! (client/select *redis-pool* "1")))
+  (binding [*redis-pool* (core/make-pool {:db "1"})]
     (is-ok (client/<!! (client/flushdb *redis-pool*)))
     (load-seed-data)
     (f)
@@ -98,6 +97,19 @@
   (client/<!! (apply with-redis f params)))
 
 (use-fixtures :once redis-connect)
+
+#_(deftest monitor-test
+  (client/wait!! (with-redis client/set "T1" "D1"))
+  (client/wait!! (with-redis client/set "T2" "D2"))
+  (let [[m-ch close-ch] (a/<!! (with-redis client/monitor))]
+    (is (= "D1" (get-with-redis client/get "T1")))
+    (is (= "D2" (get-with-redis client/get "T2")))
+    (client/<!! m-ch)
+    (is (.contains (client/<!! m-ch) "GET"))
+    (is (.contains (client/<!! m-ch) "T2"))
+    (a/close! close-ch))
+  (is (= "D1" (get-with-redis client/get "T1")))
+  (is (= "D2" (get-with-redis client/get "T2"))))
 
 (deftest keys-test
   ;; Test a sample of functions of Redis commands in the 'KEYS' category.
