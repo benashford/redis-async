@@ -20,13 +20,13 @@
             [redis-async.pool :as pool :refer [close-connection]]
             [redis-async.protocol :as protocol]))
 
+;; Defaults
+
 (def ^:private default-redis
   {:host "localhost"
    :port 6379})
 
-(defprotocol ConnectionLifecycle
-  (start-connection [this redis])
-  (stop-connection [this]))
+;; Non-canon protocol
 
 (defrecord ClientErr [t]
   protocol/RespType
@@ -36,6 +36,12 @@
       (ex-info (str "Error talking to Redis: " msg) {:type  :redis-client
                                                      :msg   msg
                                                      :cause t}))))
+
+;; Connections
+
+(defprotocol ConnectionLifecycle
+  (start-connection [this redis])
+  (stop-connection [this]))
 
 (defn- write-error-to [ch t]
   (a/put! ch (->ClientErr t)))
@@ -173,22 +179,18 @@
         con   @(tcp/client redis)]
     (->Connection pool con nil nil)))
 
-(defn make-pool
-  "Make a connection pool to a specific redis thing"
-  [redis]
-  (pool/make-pool (reify pool/ConnectionFactory
-                    (test-con [this con] true)
-                    (new-con [this pool]
-                      (-> (make-connection pool redis)
-                          (start-connection redis)))
-                    (close-con [this con] (stop-connection con)))))
-
-(defn close-pool [pool]
-  (pool/close-pool pool))
-
 (defn send-cmd [pool command params]
   (let [cmd-ch (pool/get-connection pool)]
     (if-let [ret-c (send! (:cmd-ch cmd-ch)
                           (protocol/->resp (concat command params)))]
       ret-c
       (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch})))))
+
+;; Pools
+
+(defn make-pool
+  "A single redis-async connection pool consists of multiple pools depending on
+   the type of command which will be run."
+  [redis]
+  #_(let [connection-factory (make-connection-factory redis)]
+    nil))

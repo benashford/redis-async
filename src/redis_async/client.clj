@@ -73,7 +73,7 @@
 ;; Specific commands, the others are auto-generated later
 
 (defn monitor [pool]
-  (let [con     (pool/borrow-connection pool)
+  (let [con     nil ;; TODO - replace with no pool stuff (pool/borrow-connection pool)
         close-c (a/chan)
         ret-c   (a/chan)
         cmd-ch  (:cmd-ch con)
@@ -90,14 +90,14 @@
               (if-not v
                 (do
                   (a/close! ret-c)
-                  (pool/return-connection pool con))
+                  #_(pool/return-connection pool con)) ;; TODO - new pool
                 (do
                   (a/>! ret-c v)
                   (recur (a/alts! [in-c close-c])))))
             [ret-c close-c])
           (do
             (a/close! ret-c)
-            (pool/return-connection pool con)
+            #_(pool/return-connection pool con) ;; TODO - new pool
             nil))))))
 
 ;; Commands
