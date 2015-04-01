@@ -161,7 +161,8 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 6. Test coverage.
 7. Redis authentication.
 8. Scripting support.
-9. Create Clojure 1.7 version using transducers
+9. Cluster support.
+10. Create Clojure 1.7 version using transducers
 
 ## License
 
