@@ -153,7 +153,7 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Document commands that don't make sense in an async context.
+1. Blocking commands.
 2. Pub/sub commands.
 3. Transaction commands.
 4. Release 0.1.0 version.
