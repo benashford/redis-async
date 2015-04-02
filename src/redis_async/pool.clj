@@ -16,7 +16,7 @@
 
 (defprotocol ConnectionFactory
   ;; Create a new connection for the pool
-  (new-con [this])
+  (new-con [this pool])
    ;; Close the connection
   (close-con [this con]))
 
@@ -26,7 +26,9 @@
   ;; Mark a connection as done
   (close-connection [this con])
   ;; Mark a connection as done, and reusable
-  (finish-connection [this con]))
+  (finish-connection [this con])
+  ;; Close all connections
+  (close-all [this]))
 
 (defrecord SharedConnectionPool [connection-factory connection]
   Pool
@@ -34,14 +36,20 @@
   (get-connection [this]
     (if connection
       [connection this]
-      (let [new-connection (new-con connection-factory)]
+      (let [new-connection (new-con connection-factory this)]
         [new-connection (->SharedConnectionPool connection-factory new-connection)])))
   ;; Removes the shared connection
   (close-connection [this con]
-    (close-con connection-factory con)
-    (->SharedConnectionPool connection-factory nil))
+    (if (= con connection)
+      (do
+        (close-con connection-factory con)
+        (->SharedConnectionPool connection-factory nil))
+      this))
   ;; A no-op in this circumstance
-  (finish-connection [this con] this))
+  (finish-connection [this con] this)
+  ;; Close all
+  (close-all [this]
+    (close-connection this connection)))
 
 (defn make-shared-connection [connection-factory]
   (->SharedConnectionPool connection-factory nil))
@@ -51,19 +59,27 @@
   ;; Creates a new connection from the pool, always, connections are never
   ;; reused
   (get-connection [this]
-    (let [new-connection (new-con connection-factory)]
+    (let [new-connection (new-con connection-factory this)]
       [new-connection (->DedicatedConnectionPool connection-factory
                                                  (conj connections new-connection))]))
   ;; Removes the connection from the list of borrowed connections
   (close-connection [this con]
-    (close-con connection-factory con)
-    (->DedicatedConnectionPool connection-factory (remove #(= % con) connections)))
+    (if (contains? connections con)
+      (do
+        (close-con connection-factory con)
+        (->DedicatedConnectionPool connection-factory (disj connections con)))
+      this))
   ;; An alias for close-connection
   (finish-connection [this con]
-    (close-connection this con)))
+    (close-connection this con))
+  ;; Close all
+  (close-all [this]
+    (doseq [con connections]
+      (close-con connection-factory con))
+    (->DedicatedConnectionPool connection-factory #{})))
 
 (defn make-dedicated-connection [connection-factory]
-  (->DedicatedConnectionPool connection-factory []))
+  (->DedicatedConnectionPool connection-factory #{}))
 
 (defrecord BorrowedConnectionPool [connection-factory
                                    borrowed-connections
@@ -72,7 +88,7 @@
   ;; Uses a pending-connection, or creates a new one
   (get-connection [this]
     (if (empty? pending-connections)
-      (let [new-connection (new-con connection-factory)]
+      (let [new-connection (new-con connection-factory this)]
         [new-connection
          (->BorrowedConnectionPool connection-factory
                                    (conj borrowed-connections new-connection)
@@ -81,16 +97,23 @@
         [first-free-con
          (->BorrowedConnectionPool connection-factory
                                    (conj borrowed-connections first-free-con)
-                                   other-free-cons)])))
+                                   (into #{} other-free-cons))])))
   (close-connection [this con]
-    (close-con connection-factory con)
-    (->BorrowedConnectionPool connection-factory
-                              (remove #(= % con) borrowed-connections)
-                              pending-connections))
+    (if (contains? borrowed-connections)
+      (do
+        (close-con connection-factory con)
+        (->BorrowedConnectionPool connection-factory
+                                  (disj borrowed-connections con)
+                                  pending-connections))
+      this))
   (finish-connection [this con]
     (->BorrowedConnectionPool connection-factory
-                              (remove #(= % con) borrowed-connections)
-                              (conj pending-connections con))))
+                              (disj borrowed-connections con)
+                              (conj pending-connections con)))
+  (close-all [this]
+    (doseq [con (concat borrowed-connections pending-connections)]
+      (close-con connection-factory con))
+    (->BorrowedConnectionPool connection-factory #{} #{})))
 
-(defn- make-borrowed-connection [connection-factory]
-  (->DedicatedConnectionPool connection-factory [] []))
+(defn make-borrowed-connection [connection-factory]
+  (->BorrowedConnectionPool connection-factory #{} #{}))

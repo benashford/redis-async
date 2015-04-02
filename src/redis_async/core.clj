@@ -131,6 +131,8 @@
   "Send a RESP object to the channel, returns a channel from which the result
    can be read."
   [cmd-ch full-cmd]
+  {:pre [(not (nil? cmd-ch))
+         (not (nil? full-cmd))]}
   (let [ret-c (a/chan 1)]
     (if (a/put! cmd-ch [full-cmd ret-c])
       ret-c)))
@@ -179,18 +181,46 @@
         con   @(tcp/client redis)]
     (->Connection pool con nil nil)))
 
-(defn send-cmd [pool command params]
-  (let [cmd-ch (pool/get-connection pool)]
-    (if-let [ret-c (send! (:cmd-ch cmd-ch)
-                          (protocol/->resp (concat command params)))]
-      ret-c
-      (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch})))))
-
 ;; Pools
+
+(defn- make-connection-factory [redis]
+  (reify pool/ConnectionFactory
+    (new-con [_ pool]
+      (-> (make-connection pool redis)
+          (start-connection redis)))
+    (close-con [_ con]
+      (stop-connection con))))
 
 (defn make-pool
   "A single redis-async connection pool consists of multiple pools depending on
    the type of command which will be run."
   [redis]
-  #_(let [connection-factory (make-connection-factory redis)]
-    nil))
+  (let [connection-factory (make-connection-factory redis)]
+    (atom {:shared    (pool/make-shared-connection connection-factory)
+           :borrowed  (pool/make-borrowed-connection connection-factory)
+           :dedicated (pool/make-dedicated-connection connection-factory)})))
+
+(defn get-connection [pool type]
+  (let [c (promise)]
+    (swap! pool (fn [pool]
+                  (let [p       (pool type)
+                        [con p] (pool/get-connection p)]
+                    (deliver c con)
+                    (assoc pool type p))))
+    @c))
+
+(defn close-pool [pool]
+  (swap! pool (fn [pool]
+                (->> pool
+                     (map (fn [[k v]]
+                            [k (pool/close-all v)]))
+                     (into {})))))
+
+;; Standard send-command
+
+(defn send-cmd [pool command params]
+  (let [cmd-ch (get-connection pool :shared)]
+    (if-let [ret-c (send! (:cmd-ch cmd-ch)
+                          (protocol/->resp (concat command params)))]
+      ret-c
+      (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch})))))
