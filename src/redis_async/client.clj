@@ -73,7 +73,9 @@
 ;; Specific commands, the others are auto-generated later
 
 (defn monitor [pool]
-  (let [con     (pool/borrow-connection pool)
+  (let [d-pool  (@pool :dedicated)
+        con     (get-connection pool :dedicated)
+        _       (assert (not (nil? con)))
         close-c (a/chan)
         ret-c   (a/chan)
         cmd-ch  (:cmd-ch con)
@@ -81,7 +83,7 @@
         quit    (fn []
                   (a/close! ret-c)
                   (a/put! cmd-ch [(protocol/->resp ["QUIT"]) (a/chan 1)])
-                  (pool/close-connection pool con))]
+                  (pool/close-connection d-pool con))]
     (a/go
       (let [ok (a/<! (send! cmd-ch (protocol/->resp ["MONITOR"])))]
         (if (= (protocol/->clj ok) "OK")
@@ -90,14 +92,14 @@
               (if-not v
                 (do
                   (a/close! ret-c)
-                  (pool/return-connection pool con))
+                  (pool/finish-connection d-pool con))
                 (do
                   (a/>! ret-c v)
                   (recur (a/alts! [in-c close-c])))))
             [ret-c close-c])
           (do
             (a/close! ret-c)
-            (pool/return-connection pool con)
+            (pool/finish-connection d-pool con)
             nil))))))
 
 ;; Commands

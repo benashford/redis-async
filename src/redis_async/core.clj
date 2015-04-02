@@ -20,13 +20,13 @@
             [redis-async.pool :as pool :refer [close-connection]]
             [redis-async.protocol :as protocol]))
 
+;; Defaults
+
 (def ^:private default-redis
   {:host "localhost"
    :port 6379})
 
-(defprotocol ConnectionLifecycle
-  (start-connection [this redis])
-  (stop-connection [this]))
+;; Non-canon protocol
 
 (defrecord ClientErr [t]
   protocol/RespType
@@ -36,6 +36,12 @@
       (ex-info (str "Error talking to Redis: " msg) {:type  :redis-client
                                                      :msg   msg
                                                      :cause t}))))
+
+;; Connections
+
+(defprotocol ConnectionLifecycle
+  (start-connection [this redis])
+  (stop-connection [this]))
 
 (defn- write-error-to [ch t]
   (a/put! ch (->ClientErr t)))
@@ -125,6 +131,8 @@
   "Send a RESP object to the channel, returns a channel from which the result
    can be read."
   [cmd-ch full-cmd]
+  {:pre [(not (nil? cmd-ch))
+         (not (nil? full-cmd))]}
   (let [ret-c (a/chan 1)]
     (if (a/put! cmd-ch [full-cmd ret-c])
       ret-c)))
@@ -173,21 +181,45 @@
         con   @(tcp/client redis)]
     (->Connection pool con nil nil)))
 
+;; Pools
+
+(defn- make-connection-factory [redis]
+  (reify pool/ConnectionFactory
+    (new-con [_ pool]
+      (-> (make-connection pool redis)
+          (start-connection redis)))
+    (close-con [_ con]
+      (stop-connection con))))
+
 (defn make-pool
-  "Make a connection pool to a specific redis thing"
+  "A single redis-async connection pool consists of multiple pools depending on
+   the type of command which will be run."
   [redis]
-  (pool/make-pool (reify pool/ConnectionFactory
-                    (test-con [this con] true)
-                    (new-con [this pool]
-                      (-> (make-connection pool redis)
-                          (start-connection redis)))
-                    (close-con [this con] (stop-connection con)))))
+  (let [connection-factory (make-connection-factory redis)]
+    (atom {:shared    (pool/make-shared-connection connection-factory)
+           :borrowed  (pool/make-borrowed-connection connection-factory)
+           :dedicated (pool/make-dedicated-connection connection-factory)})))
+
+(defn get-connection [pool type]
+  (let [c (promise)]
+    (swap! pool (fn [pool]
+                  (let [p       (pool type)
+                        [con p] (pool/get-connection p)]
+                    (deliver c con)
+                    (assoc pool type p))))
+    @c))
 
 (defn close-pool [pool]
-  (pool/close-pool pool))
+  (swap! pool (fn [pool]
+                (->> pool
+                     (map (fn [[k v]]
+                            [k (pool/close-all v)]))
+                     (into {})))))
+
+;; Standard send-command
 
 (defn send-cmd [pool command params]
-  (let [cmd-ch (pool/get-connection pool)]
+  (let [cmd-ch (get-connection pool :shared)]
     (if-let [ret-c (send! (:cmd-ch cmd-ch)
                           (protocol/->resp (concat command params)))]
       ret-c
