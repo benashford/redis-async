@@ -178,6 +178,10 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 ##
 ```
 
+## Testing
+
+To run tests `lein test`.  Please not this requires a Redis instance running on `localhost` and the default Redis port.  Also, please note, this will trash anything in database 1 on that instance.
+
 ## Still to-do
 
 1. Pub/sub commands.
@@ -186,10 +190,9 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 4. Release 0.1.0 version.
 5. Performance testing.
 6. Test coverage.
-7. Redis authentication.
-8. Scripting support.
-9. Cluster support.
-10. Create Clojure 1.7 version using transducers
+7. Scripting support.
+8. Cluster support.
+9. Create Clojure 1.7 version using transducers
 
 ## License
 
