@@ -84,8 +84,7 @@ On the other hand, with an async client, such "blocking" operations will never b
 ```clojure
 redis-async.client> (def p (make-pool {}))
 #'redis-async.client/p
-redis-async.client> (a/go (let [[list msg] (<! (blpop p "LIST1" 0))] (println "*** Got" msg "from" li
-st)))
+redis-async.client> (a/go (let [[list msg] (<! (blpop p "LIST1" 0))] (println "*** Got" msg "from" list)))
 #<ManyToManyChannel clojure.core.async.impl.channels.ManyToManyChannel@49bc5015>
 redis-async.client> ;; time passes
 redis-async.client> (rpush p "LIST1" "Some Data")
@@ -181,10 +180,9 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Blocking commands (documentation).
-2. Pub/sub commands.
-3. Transaction commands.
-4. Explain RESP objects (e.g. DUMP/RESTORE)
+1. Pub/sub commands.
+2. Transaction commands.
+3. Explain RESP objects (e.g. DUMP/RESTORE)
 4. Release 0.1.0 version.
 5. Performance testing.
 6. Test coverage.
