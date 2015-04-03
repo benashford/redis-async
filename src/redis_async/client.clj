@@ -84,6 +84,14 @@
 (defmacro wait!! [expr]
   `(check-wait-for-errors (a/<!! (a/into [] ~expr))))
 
+;; Prepare custom commands
+
+(defn- command->resp [command args]
+  (->> args
+       (map coerce-to-string)
+       (cons command)
+       protocol/->resp))
+
 ;; Specific commands, the others are auto-generated later
 
 (defn monitor [pool]
@@ -119,9 +127,7 @@
 (defn- blocking-command [cmd pool & params]
   (let [con   (get-connection pool :borrowed)
         ret-c (->> params
-                   (map coerce-to-string)
-                   (cons cmd)
-                   protocol/->resp
+                   (command->resp cmd)
                    (send! (:cmd-ch con)))]
     (a/go
       (let [res (a/<! ret-c)]
@@ -132,11 +138,93 @@
 (def brpop (partial blocking-command "BRPOP"))
 (def brpoplpush (partial blocking-command "BRPOPLPUSH"))
 
+;; Pub-sub
+
+(defn- unsubscribe-from [subs channel]
+  (if-let [out-c (subs channel)]
+    (do
+      (a/close! out-c)
+      (dissoc subs channel))
+    subs))
+
+(defn- make-pub-sub [pool]
+  (let [p       (pool :pub-sub-c)
+        [con p] (pool/get-connection p)
+        in-c    (:in-c con)
+        subs    (atom {})
+        psubs   (atom {})]
+    (a/go
+      (loop [msg (a/<! in-c)]
+        (when msg
+          (let [[msg-type channel data] (:values msg)
+                msg-type                (protocol/->clj msg-type)
+                channel                 (protocol/->clj channel)]
+            (case msg-type
+              "subscribe" nil
+              "psubscribe" nil
+              "unsubscribe"
+              (swap! subs unsubscribe-from channel)
+              "punsubscribe"
+              (swap! psubs unsubscribe-from channel)
+              "message"
+              (when-let [out-ch (@subs channel)]
+                (a/>! out-ch data))
+              "pmessage"
+              (when-let [out-ch (@psubs channel)]
+                (a/>! out-ch data)))
+            (recur (a/<! in-c))))))
+    [p
+     {:cmd-ch (:cmd-ch con)
+      :subs   subs
+      :psubs  psubs}]))
+
+(defn- get-pub-sub [pool]
+  (let [pub-sub (promise)]
+    (swap! pool (fn [pool]
+                  (if-let [ps (:pub-sub pool)]
+                    (do
+                      (deliver pub-sub ps)
+                      pool)
+                    (let [[p ps] (make-pub-sub pool)]
+                      (deliver pub-sub ps)
+                      (assoc pool
+                             :pub-sub ps
+                             :pub-sub-c p)))))
+    @pub-sub))
+
+(def ^:private pub-sub-buffer-default 16)
+
+(defn- subscribe-to [subs channels c]
+  (reduce (fn [subs channel]
+            (assoc subs channel c))
+          subs
+          channels))
+
+(defn- subscribe-cmd [cmd ch-pool pool & channels]
+  (let [pub-sub (get-pub-sub pool)
+        ret-c   (a/chan pub-sub-buffer-default)
+        subs    (pub-sub ch-pool)]
+    (assert (not (nil? subs)))
+    (swap! subs subscribe-to channels ret-c)
+    (a/put! (:cmd-ch pub-sub) (command->resp cmd channels))
+    ret-c))
+
+(def subscribe (partial subscribe-cmd "SUBSCRIBE" :subs))
+(def psubscribe (partial subscribe-cmd "PSUBSCRIBE" :psubs))
+
+(defn unsubscribe-cmd [cmd pool & channels]
+  (let [pub-sub (get-pub-sub pool)]
+    (a/put! (:cmd-ch pub-sub) (command->resp cmd channels))))
+
+(def unsubscribe (partial unsubscribe-cmd "UNSUBSCRIBE"))
+(def punsubscribe (partial unsubscribe-cmd "PUNSUBSCRIBE"))
+
 ;; All other commands
 
 (def ^:private overriden-clients
   #{"monitor" ;; needs a dedicated connection listing all traffic
     "blpop" "brpop" "brpoplpush" ;; blocking commands
+    "subscribe" "unsubscribe" "psubscribe" "punsubscribe" ;; pub-sub
     })
 
 (defn- load-commands-meta []

@@ -40,6 +40,7 @@
         [new-connection (->SharedConnectionPool connection-factory new-connection)])))
   ;; Removes the shared connection
   (close-connection [this con]
+    (assert (not (nil? con)))
     (if (= con connection)
       (do
         (close-con connection-factory con)
@@ -49,7 +50,9 @@
   (finish-connection [this con] this)
   ;; Close all
   (close-all [this]
-    (close-connection this connection)))
+    (if connection
+      (close-connection this connection)
+      this)))
 
 (defn make-shared-connection [connection-factory]
   (->SharedConnectionPool connection-factory nil))

@@ -40,7 +40,7 @@
 ;; Connections
 
 (defprotocol ConnectionLifecycle
-  (start-connection [this redis])
+  (start-connection [this redis post-con-f])
   (stop-connection [this]))
 
 (defn- write-error-to [ch t]
@@ -94,6 +94,20 @@
             (recur)))
         (catch Throwable t
           (a/close! ret-c-c)
+          t)))))
+
+(defn- pub-sub-stream
+  "Process the stream as used in pub-sub connections"
+  [con]
+  (let [cmd-ch     (:cmd-ch con)
+        connection (:connection con)]
+    (a/go
+      (try
+        (loop []
+          (let [frame (a/<! cmd-ch)]
+            (stream/put! connection (protocol/encode-one frame)))
+          (recur))
+        (catch Throwable t
           t)))))
 
 (defn- process-stream
@@ -158,7 +172,7 @@
 
 (defrecord Connection [pool connection cmd-ch in-c]
   ConnectionLifecycle
-  (start-connection [this redis]
+  (start-connection [this redis post-con-f]
     (let [cmd-ch   (a/chan)
           in-raw-c (a/chan pipelineable-size)
           in-c     (a/chan pipelineable-size)]
@@ -166,7 +180,8 @@
       (protocol/decode in-raw-c in-c)
       (authenticate cmd-ch in-c redis)
       (let [new-con (->Connection pool connection cmd-ch in-c)]
-        (process-stream new-con)
+        (when post-con-f
+          (post-con-f new-con))
         new-con)))
   (stop-connection [this]
     (pool/close-connection pool this)
@@ -183,20 +198,24 @@
 
 ;; Pools
 
-(defn- make-connection-factory [redis]
+(defn- make-connection-factory [redis & [post-con-f]]
   (reify pool/ConnectionFactory
     (new-con [_ pool]
       (-> (make-connection pool redis)
-          (start-connection redis)))
+          (start-connection redis post-con-f)))
     (close-con [_ con]
+      (assert (not (nil? con)))
       (stop-connection con))))
 
 (defn make-pool
   "A single redis-async connection pool consists of multiple pools depending on
    the type of command which will be run."
   [redis]
-  (let [connection-factory (make-connection-factory redis)]
+  (let [connection-factory (make-connection-factory redis process-stream)]
     (atom {:shared    (pool/make-shared-connection connection-factory)
+           :pub-sub-c (pool/make-shared-connection
+                       (make-connection-factory redis
+                                                pub-sub-stream))
            :borrowed  (pool/make-borrowed-connection connection-factory)
            :dedicated (pool/make-dedicated-connection connection-factory)})))
 
