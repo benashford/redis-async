@@ -94,6 +94,16 @@ redis-async.client> (rpush p "LIST1" "Some Data")
 *** Got Some Data from LIST1
 ```
 
+##### Pub/sub
+
+Redis has a [publish/subscribe mechanism](http://redis.io/topics/pubsub).  Once again the semantics for these commands differ from the default.  Once subscribed to a (Redis) channel, the connection will contain multiple messages that are sent to that channel; therefore connections that are used for pub/sub need to be kept appart from those normally used.
+
+However there are similarities, a single connection can alter the channels that it is subscribed to, allowing a single connection to be used the library can route messages.
+
+`subscribe` and `psubscribe` each subscribe to one or more (Redis) channels, and returns a single (`core.async`) channel which will contain every message sent to those subscribed channels.
+
+`unsubscribe` and `punsubscribe` does the opposite and unsubscribed from the (Redis) channel, closing the (`core.async`) channel as it does so.
+
 ### Other client functions
 
 The convenience functions for dealing with channels follow the same naming convention as `core.async` namely using a single `!` for those which work in a `go` block, and a double `!!` for those outside of a `go` block.
@@ -184,15 +194,14 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Document Pub/sub commands.
-2. Transaction commands.
-3. Explain RESP objects (e.g. DUMP/RESTORE)
-4. Release 0.1.0 version.
-5. Performance testing.
-6. Test coverage.
-7. Scripting support.
-8. Cluster support.
-9. Create Clojure 1.7 version using transducers
+1. Transaction commands.
+2. Explain RESP objects (e.g. DUMP/RESTORE)
+3. Release 0.1.0 version.
+4. Performance testing.
+5. Test coverage.
+6. Scripting support.
+7. Cluster support.
+8. Create Clojure 1.7 version using transducers
 
 ## License
 
