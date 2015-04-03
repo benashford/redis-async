@@ -20,7 +20,7 @@
 
 ;; utilities
 
-(defn bytes->str [bytes]
+(defn bytes->str [^bytes bytes]
   (String. bytes))
 
 (defn str->bytes [^String string]
@@ -368,10 +368,10 @@
    the input channel for higher-level logic."
   [raw-ch in-ch]
   (a/go
-    (loop [^ByteBuffer input nil
-           state             '({})]
+    (loop [input nil
+           state '({})]
       (let [readable-bytes (if input
-                             (.remaining input)
+                             (.remaining ^ByteBuffer input)
                              0)]
         ;; Do we have any bytes to read
         (if (< readable-bytes 2)
@@ -390,7 +390,7 @@
           (let [mode (:mode (first state))]
             (if (not mode)
               ;; discover next mode
-              (let [first-byte (.get input)
+              (let [first-byte (.get ^ByteBuffer input)
                     next-mode  (byte->mode first-byte)]
                 (recur input (conj (next state) {:mode next-mode})))
               ;; we know the mode

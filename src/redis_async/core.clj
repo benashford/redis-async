@@ -28,7 +28,7 @@
 
 ;; Non-canon protocol
 
-(defrecord ClientErr [t]
+(defrecord ClientErr [^Throwable t]
   protocol/RespType
   (get-type [this] :client-err)
   (->clj [this]
