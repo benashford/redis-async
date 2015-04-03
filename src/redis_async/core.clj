@@ -17,7 +17,7 @@
             [clojure.core.async :as a]
             [clojure.string :as s]
             [manifold.stream :as stream]
-            [redis-async.pool :as pool :refer [close-connection]]
+            [redis-async.pool :as pool]
             [redis-async.protocol :as protocol]))
 
 ;; Defaults
@@ -208,6 +208,16 @@
                     (deliver c con)
                     (assoc pool type p))))
     @c))
+
+(defn finish-connection [pool type con]
+  (swap! pool (fn [pool]
+                (let [p (pool type)]
+                  (assoc pool type (pool/finish-connection p con))))))
+
+(defn close-connection [pool type con]
+  (swap! pool (fn [pool]
+                (let [p (pool type)]
+                  (assoc pool type (pool/close-connection p con))))))
 
 (defn close-pool [pool]
   (swap! pool (fn [pool]

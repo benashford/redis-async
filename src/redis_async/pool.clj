@@ -93,11 +93,11 @@
          (->BorrowedConnectionPool connection-factory
                                    (conj borrowed-connections new-connection)
                                    pending-connections)])
-      (let [[first-free-con & other-free-cons] pending-connections]
+      (let [first-free-con (first pending-connections)]
         [first-free-con
          (->BorrowedConnectionPool connection-factory
                                    (conj borrowed-connections first-free-con)
-                                   (into #{} other-free-cons))])))
+                                   (into #{} (rest pending-connections)))])))
   (close-connection [this con]
     (if (contains? borrowed-connections)
       (do

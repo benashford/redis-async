@@ -22,6 +22,24 @@
             [redis-async.pool :as pool]
             [redis-async.protocol :as protocol]))
 
+;; Internal utilities
+
+(defn- is-str? [v]
+  (or (= (class v) redis_async.protocol.Str)
+      (= (class v) redis_async.protocol.BulkStr)))
+
+(defn- coerce-to-string [val]
+  (cond
+   (or (string? val)
+       (is-str? val))
+   val
+
+   (keyword? val)
+   (-> val name s/upper-case)
+
+   :else
+   (str val)))
+
 ;; Useful to enforce conventions
 
 (defn read-value [msg]
@@ -37,10 +55,6 @@
 
 (defmacro <!! [expr]
   `(read-value (a/<!! ~expr)))
-
-(defn- is-str? [v]
-  (or (= (class v) redis_async.protocol.Str)
-      (= (class v) redis_async.protocol.BulkStr)))
 
 (defn faf
   "Fire-and-forget.  Warning: if no error-callback is defined, all errors are
@@ -73,9 +87,7 @@
 ;; Specific commands, the others are auto-generated later
 
 (defn monitor [pool]
-  (let [d-pool  (@pool :dedicated)
-        con     (get-connection pool :dedicated)
-        _       (assert (not (nil? con)))
+  (let [con     (get-connection pool :dedicated)
         close-c (a/chan)
         ret-c   (a/chan)
         cmd-ch  (:cmd-ch con)
@@ -83,7 +95,7 @@
         quit    (fn []
                   (a/close! ret-c)
                   (a/put! cmd-ch [(protocol/->resp ["QUIT"]) (a/chan 1)])
-                  (pool/close-connection d-pool con))]
+                  (close-connection pool :dedicated con))]
     (a/go
       (let [ok (a/<! (send! cmd-ch (protocol/->resp ["MONITOR"])))]
         (if (= (protocol/->clj ok) "OK")
@@ -92,38 +104,46 @@
               (if-not v
                 (do
                   (a/close! ret-c)
-                  (pool/finish-connection d-pool con))
+                  (finish-connection pool :dedicated con))
                 (do
                   (a/>! ret-c v)
                   (recur (a/alts! [in-c close-c])))))
             [ret-c close-c])
           (do
             (a/close! ret-c)
-            (pool/finish-connection d-pool con)
+            (finish-connection pool :dedicated con)
             nil))))))
 
-;; Commands
+;; Blocking commands
+
+(defn- blocking-command [cmd pool & params]
+  (let [con   (get-connection pool :borrowed)
+        ret-c (->> params
+                   (map coerce-to-string)
+                   (cons cmd)
+                   protocol/->resp
+                   (send! (:cmd-ch con)))]
+    (a/go
+      (let [res (a/<! ret-c)]
+        (finish-connection pool :borrowed con)
+        res))))
+
+(def blpop (partial blocking-command "BLPOP"))
+(def brpop (partial blocking-command "BRPOP"))
+(def brpoplpush (partial blocking-command "BRPOPLPUSH"))
+
+;; All other commands
 
 (def ^:private overriden-clients
-  #{"monitor"})
+  #{"monitor" ;; needs a dedicated connection listing all traffic
+    "blpop" "brpop" "brpoplpush" ;; blocking commands
+    })
 
 (defn- load-commands-meta []
   (->> "commands.json"
        io/resource
        slurp
        json/decode))
-
-(defn- coerce-to-string [val]
-  (cond
-   (or (string? val)
-       (is-str? val))
-   val
-
-   (keyword? val)
-   (-> val name s/upper-case)
-
-   :else
-   (str val)))
 
 (defn- emit-client-fn [fn-n summary]
   (let [cmd  (as-> fn-n x

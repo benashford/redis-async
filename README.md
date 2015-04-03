@@ -53,6 +53,12 @@ Each Redis command has an equivalent function in `redis-async.client`.  These ca
 
 Rather than a traditional connection pool as a means of allowing multiple threads access to the database via multiple connections, this library will multiplex Redis commands from many threads into a single queue (pipelining if possible).  However some commands require a dedicated connecton, these are explained in more detail below.
 
+To create a connection pool, call `make-pool` in `redis-async.core` passing in a map of connection details (host, port, password (if any), and database (defaults to 0)).  An empty map will default to localhost and the default Redis port.
+
+To clean-up a connection pool at the end, call `close-pool` in `redis-async.core`.
+
+This library does not enforce the use of any component systems, but the above was designed to painlessly be used by them.
+
 ### Client functions
 
 Each function that implements a Redis command returns a channel, from which the result of that command can be read.  These can be read like any other `core.async` channel, or one of the convenience functions/macros can be used instead; the main difference between the convenience options and anything else is that they ensure conventions are in place (e.g. it allows a Redis operation to return nil, usually you cannot send nil through a `core.async` channel).
@@ -66,6 +72,28 @@ The vast majority of Redis commands are simple request/response commands.  There
 The [`monitor`](http://redis.io/commands/monitor) command will return an infinite (until you tell it to stop) sequence of all activity on a Redis server.
 
 The monitor function returns a channel, if call succeeds this yields a vector containing two channels.  The first channel contains each monitored command, on a line-by-line basis; the second is used to stop monitoring, closing this channel will stop.
+
+##### `BLPOP`, `BRPOP`, and `BRPOPLPUSH`
+
+All these commands are blocking, the Redis server will wait until data becomes available to return.  While you may think blocking operations are an anethema to an async client, it doesn't have to be so.
+
+The Redis protocol defines that such operations will mean a connection cannot be used for any other purpose while it's blocked.  So the implementation of these blocking commands cannot use the single, shared, connection; users should therefore be aware that by using these commands will result in this library creating more connections.  Such additional connections will be reused where appropriate, the number created therefore will be the maximum of the number of concurrent blocking connections.
+
+On the other hand, with an async client, such "blocking" operations will never block a thread so can be used for triggering/co-ordinating asynchronous code.  For example:
+
+```clojure
+redis-async.client> (def p (make-pool {}))
+#'redis-async.client/p
+redis-async.client> (a/go (let [[list msg] (<! (blpop p "LIST1" 0))] (println "*** Got" msg "from" li
+st)))
+#<ManyToManyChannel clojure.core.async.impl.channels.ManyToManyChannel@49bc5015>
+redis-async.client> ;; time passes
+redis-async.client> (rpush p "LIST1" "Some Data")
+#<ManyToManyChannel clojure.core.async.impl.channels.ManyToManyChannel@155de840>
+
+;; Std-out then shows:
+*** Got Some Data from LIST1
+```
 
 ### Other client functions
 
@@ -153,9 +181,10 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 ## Still to-do
 
-1. Blocking commands.
+1. Blocking commands (documentation).
 2. Pub/sub commands.
 3. Transaction commands.
+4. Explain RESP objects (e.g. DUMP/RESTORE)
 4. Release 0.1.0 version.
 5. Performance testing.
 6. Test coverage.
