@@ -2,13 +2,9 @@
 
 [![Build Status](https://travis-ci.org/benashford/redis-async.svg)](https://travis-ci.org/benashford/redis-async)
 
-Development for an asynchronous Redis client for Clojure.  Currently under development, not yet ready for use.
+Experimental asynchronous Redis client for Clojure.
 
-## Availability
-
-Will be available via Clojars when it reaches the appropriate levels of completeness, stability and performance.
-
-A snapshot of a (recent) development version is available on Clojars:
+Available from Clojars:
 
 [![Clojars Project](http://clojars.org/redis-async/latest-version.svg)](http://clojars.org/redis-async)
 
