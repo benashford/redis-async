@@ -104,6 +104,10 @@ However there are similarities, a single connection can alter the channels that 
 
 `unsubscribe` and `punsubscribe` does the opposite and unsubscribed from the (Redis) channel, closing the (`core.async`) channel as it does so.
 
+#### Transactions
+
+Redis transactions are supported using the `with-transaction` macro in `redis-async.core`.  Any code contained within the body a `with-transaction` block will be submitted as a transaction.  This means the response to individual commands will be an acknowledgement, the actual results of the whole block are returned at the end.
+
 ### Other client functions
 
 The convenience functions for dealing with channels follow the same naming convention as `core.async` namely using a single `!` for those which work in a `go` block, and a double `!!` for those outside of a `go` block.
@@ -194,14 +198,13 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Document transaction commands.
-2. Explain RESP objects (e.g. DUMP/RESTORE)
-3. Release 0.1.0 version.
-4. Performance testing.
-5. Test coverage.
-6. Scripting support.
-7. Cluster support.
-8. Create Clojure 1.7 version using transducers
+1. Explain RESP objects (e.g. DUMP/RESTORE)
+2. Release 0.1.0 version.
+3. Performance testing.
+4. Test coverage.
+5. Scripting support.
+6. Cluster support.
+7. Create Clojure 1.7 version using transducers
 
 ## License
 
