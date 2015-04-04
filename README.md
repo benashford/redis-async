@@ -18,10 +18,10 @@ There are two primary design goals.  First, to be async, using `core.async`, for
 
 ## Features
 
-* Full (when complete) implementation of all Redis commands.
-* Support for Lua scripting (not yet started).
+* All redis commands, including blocking commands and pub/sub commands.
 * Multiplex many concurrent requests onto a single Redis connection.
 * Implicit pipelining.
+* Support for transactions.
 
 ## How to use
 
@@ -58,6 +58,12 @@ To create a connection pool, call `make-pool` in `redis-async.core` passing in a
 To clean-up a connection pool at the end, call `close-pool` in `redis-async.core`.
 
 This library does not enforce the use of any component systems, but the above was designed to painlessly be used by them.
+
+### Implementation challenges
+
+There's a number of differences of philosophy that crop up implementing a Redis client in Clojure.  One example is differences in the definition of a 'string', in Redis this means 'byte-array' essentially; however most use-cases for a Redis client would expect to use Strings rather than byte arrays.  But, converting byte arrays to String silently would break a number of edge cases (e.g. the `DUMP` and `RESTORE` commands, the conversion would subtly alter the string in such a way it couldn't be restored).
+
+To overcome this, an intermediate format is used.  Using the raw `core.async` operations on a channel will return the intermediate format from which a byte-array could be extracted; but in most cases, when high-level defaults apply, there are [alternative channel operations that do sensible defaults](#other-client-functions).
 
 ### Client functions
 
@@ -198,13 +204,12 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Explain RESP objects (e.g. DUMP/RESTORE)
-2. Release 0.1.0 version.
-3. Performance testing.
-4. Test coverage.
-5. Scripting support.
-6. Cluster support.
-7. Create Clojure 1.7 version using transducers
+1. Release 0.1.0 version.
+2. Performance testing.
+3. Test coverage.
+4. Scripting support.
+5. Cluster support.
+6. Create Clojure 1.7 version using transducers
 
 ## License
 
