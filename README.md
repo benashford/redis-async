@@ -200,11 +200,12 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Performance testing.
-2. Test coverage.
-3. Scripting support.
-4. Cluster support.
-5. Create Clojure 1.7 version using transducers
+1. Scripting support.
+2. Performance testing.
+3. Test coverage.
+4. Scripting support.
+5. Cluster support.
+6. Create Clojure 1.7 version using transducers
 
 ## License
 

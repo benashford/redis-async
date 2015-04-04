@@ -240,7 +240,7 @@
 
 (defn close-pool [pool]
   (swap! pool (fn [pool]
-                (->> pool
+                (->> (dissoc pool :misc)
                      (map (fn [[k v]]
                             [k (pool/close-all v)]))
                      (into {})))))
