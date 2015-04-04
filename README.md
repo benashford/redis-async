@@ -194,7 +194,7 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Transaction commands.
+1. Document transaction commands.
 2. Explain RESP objects (e.g. DUMP/RESTORE)
 3. Release 0.1.0 version.
 4. Performance testing.

@@ -225,6 +225,7 @@
   #{"monitor" ;; needs a dedicated connection listing all traffic
     "blpop" "brpop" "brpoplpush" ;; blocking commands
     "subscribe" "unsubscribe" "psubscribe" "punsubscribe" ;; pub-sub
+    "multi" "exec" "discard" ;; transactions
     })
 
 (defn- load-commands-meta []

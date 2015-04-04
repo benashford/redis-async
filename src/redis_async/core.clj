@@ -247,9 +247,34 @@
 
 ;; Standard send-command
 
+(def ^:dynamic *trans-con* nil)
+
 (defn send-cmd [pool command params]
-  (let [cmd-ch (get-connection pool :shared)]
-    (if-let [ret-c (send! (:cmd-ch cmd-ch)
+  (let [con (or *trans-con* (get-connection pool :shared))]
+    (if-let [ret-c (send! (:cmd-ch con)
                           (protocol/->resp (concat command params)))]
       ret-c
-      (throw (ex-info "Command-channel closed!" {:cmd-ch cmd-ch})))))
+      (throw (ex-info "Command-channel closed!" {:cmd-ch con})))))
+
+(defn- finish-transaction [pool con finish-with]
+  (let [close-ch (send! (:cmd-ch con) (protocol/->resp [finish-with]))]
+    (a/go
+      (let [result (a/<! close-ch)]
+        (finish-connection pool :borrowed con)
+        result))))
+
+(defn do-with-transaction [pool work-f]
+  (let [con    (get-connection pool :borrowed)
+        cmd-ch (:cmd-ch con)
+        init-c (send! cmd-ch
+                      (protocol/->resp ["MULTI"]))]
+    (try
+      (binding [*trans-con* con]
+        (work-f))
+      (finish-transaction pool con "EXEC")
+      (catch Throwable t
+        (finish-transaction pool con "DISCARD")
+        (throw t)))))
+
+(defmacro with-transaction [pool & body]
+  `(do-with-transaction ~pool (fn [] ~@body)))
