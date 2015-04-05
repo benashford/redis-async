@@ -14,7 +14,9 @@
 
 (ns redis-async.scripting
   (:require [clojure.core.async :as a]
-            [redis-async.client :as client]))
+            [redis-async.core :as core]
+            [redis-async.client :as client]
+            [redis-async.protocol :as protocol]))
 
 (defn script-name->sha [pool script-name]
   (get-in @pool [:misc :scripts script-name]))
@@ -22,9 +24,10 @@
 (defn save-script [pool script-name script-body]
   (if script-body
     (a/go
-      (let [sha (client/<! (client/script-load pool script-body))]
-        (swap! pool assoc-in [:misc :scripts script-name] sha)
-        sha))
+      (let [result (a/<! (client/script-load pool script-body))]
+        (if-not (core/is-error? result)
+          (swap! pool assoc-in [:misc :scripts script-name] (protocol/->clj result)))
+        result))
     (throw (ex-info "No script provided" {:name script-name}))))
 
 (defn call-saved-script [pool sha keys args]
@@ -42,7 +45,9 @@
           (call-saved-script pool# sha# keys# args#)
           (a/go
             (let [sha# (a/<! (save-script pool# ~script-name-str ~script-body))]
-              (a/<! (call-saved-script pool# sha# keys# args#)))))))))
+              (if (core/is-error? sha#)
+                sha#
+                (a/<! (call-saved-script pool# (protocol/->clj sha#) keys# args#))))))))))
 
 (defn from
   "Convenience function to load a script into a String so it can be defined with

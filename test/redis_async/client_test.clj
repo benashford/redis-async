@@ -14,9 +14,7 @@
     c))
 
 (defn- make-error [msg]
-  (->> msg
-       protocol/str->bytes
-       protocol/->Err))
+  (protocol/->Err msg))
 
 (deftest <!-test
   (is (nil? (a/<!! (a/go (client/<! (make-test-channel nil))))))

@@ -56,14 +56,12 @@
   ToResp
   (->resp [this] this))
 
-(defrecord Err [bytes]
+(defrecord Err [msg]
   RespType
   (get-type [this] :err)
   (->clj [this]
-    (let [msg (bytes->str bytes)]
-      (ex-info (str "Error from Redis: " msg) {:type  :redis
-                                               :msg   msg
-                                               :bytes bytes})))
+    (ex-info (str "Error from Redis: " msg) {:type  :redis
+                                             :msg   msg}))
   (->raw [this] nil)
   ToResp
   (->resp [this] this))
