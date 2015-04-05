@@ -20,10 +20,12 @@
   (get-in @pool [:misc :scripts script-name]))
 
 (defn save-script [pool script-name script-body]
-  (a/go
-    (let [sha (client/<! (client/script-load pool script-body))]
-      (swap! pool assoc-in [:misc :scripts script-name] sha)
-      sha)))
+  (if script-body
+    (a/go
+      (let [sha (client/<! (client/script-load pool script-body))]
+        (swap! pool assoc-in [:misc :scripts script-name] sha)
+        sha))
+    (throw (ex-info "No script provided" {:name script-name}))))
 
 (defn call-saved-script [pool sha keys args]
   (apply client/evalsha pool sha (count keys) (concat keys args)))
@@ -41,3 +43,10 @@
           (a/go
             (let [sha# (a/<! (save-script pool# ~script-name-str ~script-body))]
               (a/<! (call-saved-script pool# sha# keys# args#)))))))))
+
+(defn from
+  "Convenience function to load a script into a String so it can be defined with
+  defscript"
+  [path-to-script]
+  (when-let [script-url (clojure.java.io/resource path-to-script)]
+    (slurp script-url)))

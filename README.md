@@ -120,6 +120,31 @@ The convenience functions for dealing with channels follow the same naming conve
 
 `faf` is "fire-and-forget", just move on.  This will ensure the channel is fully consumed, but doesn't wait.
 
+### Scripting support
+
+A useful, and arguably underused, feature of Redis is it's [scripting support](http://redis.io/commands/eval).  The built-in low-level commands `EVAL`, `EVALSHA`, `SCRIPT LOAD`, etc. are all present and work as you would expect.  But `redis-async` also contains higher-level support to make working with server-side scripts easier.
+
+The `defscript` macro will generate a function given a Lua script.  This function will ensure that the script is loaded onto the Redis server (once per instance of a [connection pool](#the-connection-pool)), calling the function will execute an `EVALSHA` on that script.
+
+Example:
+
+```clojure
+(defscript test-script
+  "redis.call('incr', KEYS[1])
+  return redis.call('get', KEYS[1])")
+
+;; then calling it, like so:
+
+redis-async.client> (<!! (test-script p ["NAME-OF-KEY"]))
+"1"
+```
+
+For scripts too long/unweildy to be defined in-line, the `defscript` can be combined with a utility function `from` to load a script from the class-path, allowing Lua scripts to be bundled with the application.
+
+```clojure
+(defscript test-script (from "path-to-package/test-script.lua"))
+```
+
 ## Why not just use ...?
 
 TBC: list of similarities and differences with other libraries
@@ -198,14 +223,17 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 
 To run tests `lein test`.  Please not this requires a Redis instance running on `localhost` and the default Redis port.  Also, please note, this will trash anything in database 1 on that instance.
 
+## Revision history
+
+* 0.1.0 - first feature-complete release (i.e. implementation of all Redis commands, pipelining, transactions, pub/sub, etc., only exception: cluster support).
+* 0.1.1 - additional high-level scripting functionality.
+
 ## Still to-do
 
-1. Scripting support.
-2. Performance testing.
-3. Test coverage.
-4. Scripting support.
-5. Cluster support.
-6. Create Clojure 1.7 version using transducers
+1. Performance testing.
+2. Test coverage.
+3. Cluster support.
+4. Create Clojure 1.7 version using transducers
 
 ## License
 
