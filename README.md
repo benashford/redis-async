@@ -231,11 +231,12 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Performance testing.
-2. Re-write slow bits in Java.
-3. Test coverage.
-4. Cluster support.
-5. Create Clojure 1.7 version using transducers
+1. Upgrade/move-off Aleph.
+2. Performance testing.
+3. Re-write slow bits in Java.
+4. Test coverage.
+5. Cluster support.
+6. Create Clojure 1.7 version using transducers
 
 ## License
 
