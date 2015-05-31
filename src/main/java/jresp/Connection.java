@@ -54,7 +54,7 @@ public class Connection {
     }
 
     public void write(Collection<RespType> messages) {
-        messages.stream().forEach(x -> channel.write(x));
+        messages.stream().forEach(channel::write);
         channel.flush();
     }
 }

@@ -19,6 +19,10 @@ public class BulkStr implements RespType {
         payload = s;
     }
 
+    public BulkStr() {
+        this.payload = null;
+    }
+
     @Override
     public void writeBytes(ByteBuf out) {
         out.writeByte('$');
