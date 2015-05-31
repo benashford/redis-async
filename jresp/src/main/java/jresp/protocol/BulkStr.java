@@ -38,6 +38,9 @@ public class BulkStr implements RespType {
 
     @Override
     public Object unwrap() {
+        if (payload == null) {
+            return null;
+        }
         try {
             return new String(payload, "UTF-8");
         } catch (UnsupportedEncodingException e) {
