@@ -16,7 +16,8 @@
   (:require [clojure.core.async :as a]
             [clojure.string :as s]
             [redis-async.pool :as pool]
-            [redis-async.protocol :as protocol]))
+            [redis-async.protocol :as protocol])
+  (:import [jresp Client]))
 
 ;; Defaults
 
@@ -27,7 +28,7 @@
 ;; Connections
 
 (defprotocol ConnectionLifecycle
-  (start-connection [this redis post-con-f])
+  (start-connection [this redis client post-con-f])
   (stop-connection [this]))
 
 (defn- write-error-to [ch t]
@@ -47,7 +48,7 @@
 
 (defn- send-commands
   "Asynchronously sends commands to Redis."
-  [connection cmd-ch ret-c-c]
+  [^jresp.Connection connection cmd-ch ret-c-c]
   (let [end (atom false)]
     (a/go
       (try
@@ -72,9 +73,7 @@
                                  (recur (conj frames cmd)
                                         (conj ret-cs ret-c))))))]
             (when-not (empty? frames)
-              ;; TODO - replace this with new world frame sending
-              #_(stream/put! connection (->> frames
-                                           protocol/encode-all))
+              (.write connection frames)
               (doseq [ret-c ret-cs]
                 (a/>! ret-c-c ret-c))))
           (if @end
@@ -87,14 +86,13 @@
 (defn- pub-sub-stream
   "Process the stream as used in pub-sub connections"
   [con]
-  (let [cmd-ch     (:cmd-ch con)
-        connection (:connection con)]
+  (let [cmd-ch                 (:cmd-ch con)
+        ^jresp.Connection connection (:connection con)]
     (a/go
       (try
         (loop []
           (let [frame (a/<! cmd-ch)]
-            ;; TODO - replace this with new-world frame sending
-            #_(stream/put! connection (protocol/encode-one frame)))
+            (.write connection (list frame)))
           (recur))
         (catch Throwable t
           t)))))
@@ -160,12 +158,15 @@
 
 (defrecord Connection [pool connection cmd-ch in-c]
   ConnectionLifecycle
-  (start-connection [this redis post-con-f]
+  (start-connection [this redis client post-con-f]
     (let [cmd-ch   (a/chan)
-          in-c     (a/chan pipelineable-size)]
-      ;; TODO - connect the Java callback to in-c
+          in-c     (a/chan pipelineable-size)
+          con      (.makeConnection ^Client client
+                                    (proxy [jresp.Responses] []
+                                      (responseReceived [resp]
+                                        (a/put! in-c resp))))]
       (authenticate cmd-ch in-c redis)
-      (let [new-con (->Connection pool connection cmd-ch in-c)]
+      (let [new-con (->Connection pool con cmd-ch in-c)]
         (when post-con-f
           (post-con-f new-con))
         new-con)))
@@ -176,22 +177,21 @@
 (defmethod clojure.core/print-method Connection [x writer]
   (.write writer (str (class x) "@" (System/identityHashCode x))))
 
-(defn- make-connection [pool redis]
-  ;; TODO - replace with new-world style connection
-  #_(let [redis (merge default-redis redis)
-          con   @(tcp/client redis)]
-      (->Connection pool con nil nil)))
+(defn- make-connection [pool]
+  (->Connection pool nil nil nil))
 
 ;; Pools
 
 (defn- make-connection-factory [redis & [post-con-f]]
-  (reify pool/ConnectionFactory
-    (new-con [_ pool]
-      (-> (make-connection pool redis)
-          (start-connection redis post-con-f)))
-    (close-con [_ con]
-      (assert (not (nil? con)))
-      (stop-connection con))))
+  (let [redis  (merge default-redis redis)
+        client (Client. (:host redis) (:port redis))]
+    (reify pool/ConnectionFactory
+      (new-con [_ pool]
+        (-> (make-connection pool)
+            (start-connection redis client post-con-f)))
+      (close-con [_ con]
+        (assert (not (nil? con)))
+        (stop-connection con)))))
 
 (defn make-pool
   "A single redis-async connection pool consists of multiple pools depending on
