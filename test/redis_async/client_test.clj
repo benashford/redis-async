@@ -8,13 +8,18 @@
 
 ;; Testing utilities
 
+(defn- to-resp [data]
+  (if (= (class data) jresp.protocol.Err)
+    data
+    (protocol/->resp data)))
+
 (defn- make-test-channel [& data]
   (let [c (a/chan)]
-    (a/onto-chan c (map protocol/->resp data) true)
+    (a/onto-chan c (map to-resp data) true)
     c))
 
 (defn- make-error [msg]
-  (protocol/->Err msg))
+  (jresp.protocol.Err. msg))
 
 (deftest <!-test
   (is (nil? (a/<!! (a/go (client/<! (make-test-channel nil))))))
@@ -97,7 +102,7 @@
           ;; Dump returns a binary string, so we need the raw
           ;; version
           _    (client/faf (with-redis client/del "DUMP-RESTORE"))]
-      (is (< 0 (count dump)))
+      (is (< 0 (count (.raw dump))))
       (client/wait!! (with-redis client/restore "DUMP-RESTORE" 0 dump))
       (is (= "DUMP-RESTORE-VALUE" (get-with-redis client/get "DUMP-RESTORE")))))
   (testing "EXISTS"

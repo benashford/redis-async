@@ -19,6 +19,9 @@
   (->resp [this]))
 
 (extend-protocol ToResp
+  RespType
+  (->resp [this]
+    this)
   String
   (->resp [^String this]
     (BulkStr. this))
@@ -30,7 +33,13 @@
     (Ary. (map ->resp this)))
   clojure.lang.PersistentVector
   (->resp [^clojure.lang.PersistentVector this]
-    (Ary. (map ->resp this))))
+    (Ary. (map ->resp this)))
+  nil
+  (->resp [this]
+    (BulkStr.)))
 
 (defn ->clj [^RespType resp-type]
-  (.unwrap resp-type))
+  (let [unwrapped (.unwrap resp-type)]
+    (if (= (class resp-type) jresp.protocol.Err)
+      (ex-info unwrapped {:type :redis :msg unwrapped})
+      unwrapped)))
