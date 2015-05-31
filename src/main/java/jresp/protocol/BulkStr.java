@@ -36,6 +36,10 @@ public class BulkStr implements RespType {
         out.writeBytes(Resp.CRLF);
     }
 
+    public byte[] raw() {
+        return payload;
+    }
+
     @Override
     public Object unwrap() {
         if (payload == null) {
