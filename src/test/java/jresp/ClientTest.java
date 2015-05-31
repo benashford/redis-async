@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class ClientTest {
     private Client client;
@@ -152,5 +153,17 @@ public class ClientTest {
         await();
 
         assertEquals(Arrays.asList("1", "2", "3"), results.get(3).unwrap());
+    }
+
+    @Test
+    public void nonExistantKeys() throws Exception {
+        int ops = 1;
+        latch = new CountDownLatch(ops);
+
+        con.write(Arrays.asList(get("NO-SUCH-KEY")));
+
+        await();
+
+        assertNull(results.get(0).unwrap());
     }
 }

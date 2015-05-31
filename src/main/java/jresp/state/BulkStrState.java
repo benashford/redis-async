@@ -14,8 +14,16 @@ public class BulkStrState implements State {
     public boolean decode(ByteBuf in) {
         if (stringLength == null) {
              if (intState.decode(in)) {
-                 stringLength = (int)(intState.finishInt() + 2); // To account for CRLF
+                 long len = intState.finishInt();
+                 if (len < 0) {
+                     stringLength = -1;
+                 } else {
+                     stringLength = (int)(len + 2); // To account for CRLF
+                 }
              }
+        }
+        if (stringLength < 0) {
+            return true;
         }
         if (stringLength != null) {
             int diff = stringLength - buffer.writerIndex();
@@ -34,11 +42,15 @@ public class BulkStrState implements State {
 
     @Override
     public RespType finish() {
-        int strLen = stringLength - 2; // To account for CRLF
-        byte[] result = new byte[strLen];
-        buffer.capacity(strLen);
-        buffer.getBytes(0, result);
-        buffer.release();
-        return new BulkStr(result);
+        if (stringLength < 0) {
+            return new BulkStr();
+        } else {
+            int strLen = stringLength - 2; // To account for CRLF
+            byte[] result = new byte[strLen];
+            buffer.capacity(strLen);
+            buffer.getBytes(0, result);
+            buffer.release();
+            return new BulkStr(result);
+        }
     }
 }
