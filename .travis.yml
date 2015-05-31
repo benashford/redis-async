@@ -2,5 +2,4 @@ language: clojure
 services:
   - redis-server
 jdk:
-  - oraclejdk7
   - oraclejdk8
