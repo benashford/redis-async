@@ -25,8 +25,8 @@
 ;; Internal utilities
 
 (defn- is-str? [v]
-  (or (= (class v) redis_async.protocol.Str)
-      (= (class v) redis_async.protocol.BulkStr)))
+  (or (= (class v) jresp.protocol.SimpleStr)
+      (= (class v) jresp.protocol.BulkStr)))
 
 (defn- coerce-to-string [val]
   (cond

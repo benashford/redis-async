@@ -13,10 +13,8 @@
 ;; limitations under the License.
 
 (ns redis-async.core
-  (:require [aleph.tcp :as tcp]
-            [clojure.core.async :as a]
+  (:require [clojure.core.async :as a]
             [clojure.string :as s]
-            [manifold.stream :as stream]
             [redis-async.pool :as pool]
             [redis-async.protocol :as protocol]))
 
@@ -26,17 +24,6 @@
   {:host "localhost"
    :port 6379})
 
-;; Non-canon protocol
-
-(defrecord ClientErr [^Throwable t]
-  protocol/RespType
-  (get-type [this] :client-err)
-  (->clj [this]
-    (let [msg (.getMessage t)]
-      (ex-info (str "Error talking to Redis: " msg) {:type  :redis-client
-                                                     :msg   msg
-                                                     :cause t}))))
-
 ;; Connections
 
 (defprotocol ConnectionLifecycle
@@ -44,7 +31,7 @@
   (stop-connection [this]))
 
 (defn- write-error-to [ch t]
-  (a/put! ch (->ClientErr t)))
+  (a/put! ch (protocol/->resp t)))
 
 (defn- drain
   "If a connection has failed, respond to the remaining incoming messages with
@@ -85,7 +72,8 @@
                                  (recur (conj frames cmd)
                                         (conj ret-cs ret-c))))))]
             (when-not (empty? frames)
-              (stream/put! connection (->> frames
+              ;; TODO - replace this with new world frame sending
+              #_(stream/put! connection (->> frames
                                            protocol/encode-all))
               (doseq [ret-c ret-cs]
                 (a/>! ret-c-c ret-c))))
@@ -105,7 +93,8 @@
       (try
         (loop []
           (let [frame (a/<! cmd-ch)]
-            (stream/put! connection (protocol/encode-one frame)))
+            ;; TODO - replace this with new-world frame sending
+            #_(stream/put! connection (protocol/encode-one frame)))
           (recur))
         (catch Throwable t
           t)))))
@@ -138,8 +127,7 @@
 
 (defn is-error? [v]
   (let [klass (class v)]
-    (or (= klass redis_async.protocol.Err)
-        (= klass redis_async.core.ClientErr))))
+    (= klass jresp.protocol.Err)))
 
 (defn send!
   "Send a RESP object to the channel, returns a channel from which the result
@@ -174,10 +162,8 @@
   ConnectionLifecycle
   (start-connection [this redis post-con-f]
     (let [cmd-ch   (a/chan)
-          in-raw-c (a/chan pipelineable-size)
           in-c     (a/chan pipelineable-size)]
-      (stream/connect connection in-raw-c)
-      (protocol/decode in-raw-c in-c)
+      ;; TODO - connect the Java callback to in-c
       (authenticate cmd-ch in-c redis)
       (let [new-con (->Connection pool connection cmd-ch in-c)]
         (when post-con-f
@@ -185,16 +171,16 @@
         new-con)))
   (stop-connection [this]
     (pool/close-connection pool this)
-    (stream/close! connection)
     (->Connection pool nil nil nil)))
 
 (defmethod clojure.core/print-method Connection [x writer]
   (.write writer (str (class x) "@" (System/identityHashCode x))))
 
 (defn- make-connection [pool redis]
-  (let [redis (merge default-redis redis)
-        con   @(tcp/client redis)]
-    (->Connection pool con nil nil)))
+  ;; TODO - replace with new-world style connection
+  #_(let [redis (merge default-redis redis)
+          con   @(tcp/client redis)]
+      (->Connection pool con nil nil)))
 
 ;; Pools
 
