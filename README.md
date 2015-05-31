@@ -1,6 +1,6 @@
 # redis-async
 
-[![Build Status](https://travis-ci.org/benashford/redis-async.svg)](https://travis-ci.org/benashford/redis-async)
+[![Build Status](https://travis-ci.org/benashford/redis-async.svg?branch=master)](https://travis-ci.org/benashford/redis-async)
 
 Experimental asynchronous Redis client for Clojure.
 
