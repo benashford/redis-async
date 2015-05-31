@@ -2,6 +2,7 @@ package jresp;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import jresp.protocol.ClientErr;
 import jresp.protocol.RespType;
 
 public class RespHandler extends SimpleChannelInboundHandler<RespType> {
@@ -18,12 +19,7 @@ public class RespHandler extends SimpleChannelInboundHandler<RespType> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        System.out.println("TODO: need actual error handling");
-        //
-        // TODO - a suitable message should be sent upstream to allow any connection
-        // pooling to do the right thing
-        //
-        cause.printStackTrace();
+        responses.responseReceived(new ClientErr(cause));
         ctx.close();
     }
 }
