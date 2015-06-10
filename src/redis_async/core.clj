@@ -21,8 +21,8 @@
 
 ;; Defaults
 
-(def ^:private default-redis
-  {:host "localhost"
+(defn- default-redis []
+  {:host (or (System/getenv "REDIS_HOST") "localhost")
    :port 6379})
 
 ;; Connections
@@ -183,7 +183,7 @@
 ;; Pools
 
 (defn- make-connection-factory [redis & [post-con-f]]
-  (let [redis  (merge default-redis redis)
+  (let [redis  (merge (default-redis) redis)
         client (Client. (:host redis) (:port redis))]
     (reify pool/ConnectionFactory
       (new-con [_ pool]

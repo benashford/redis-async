@@ -124,7 +124,6 @@
     (is (= ["TEST-STRING"] (get-with-redis client/keys "TEST-ST*"))))
   (testing "OBJECT"
     (is (< 0 (get-with-redis client/object :refcount "TEST-STRING")))
-    (is (= "raw" (get-with-redis client/object :encoding "TEST-STRING")))
     (is (< 0 (get-with-redis client/object :idletime "TEST-STRING"))))
   (testing "SORT"
     (doseq [d ["A" "Z" "B" "W"]]

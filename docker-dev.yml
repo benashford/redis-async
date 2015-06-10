@@ -1,0 +1,10 @@
+dev:
+  build: devbox/
+  ports:
+    - "2227:4444"
+  volumes:
+    - .:/home/ben/src
+  links:
+    - redis
+redis:
+  image: redis:3.0
