@@ -228,6 +228,7 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 * 0.1.0 - first feature-complete release (i.e. implementation of all Redis commands, pipelining, transactions, pub/sub, etc., only exception: cluster support).
 * 0.1.1 - additional high-level scripting functionality.
 * 0.1.2 - fixed inconsistencies dealing with Error responses, and also making sure that the first error is reported when dealing with script compilation errors.
+* 0.2.0 - Uses [JRESP](https://github.com/benashford/jresp) for serialising RESP.
 
 ## Still to-do
 
