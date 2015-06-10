@@ -22,8 +22,8 @@
 
 ;; Defaults
 
-(def ^:private default-redis
-  {:host "localhost"
+(defn- default-redis []
+  {:host (or (System/getenv "REDIS_HOST") "localhost")
    :port 6379})
 
 ;; Non-canon protocol
@@ -192,7 +192,7 @@
   (.write writer (str (class x) "@" (System/identityHashCode x))))
 
 (defn- make-connection [pool redis]
-  (let [redis (merge default-redis redis)
+  (let [redis (merge (default-redis) redis)
         con   @(tcp/client redis)]
     (->Connection pool con nil nil)))
 
