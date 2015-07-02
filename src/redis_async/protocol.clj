@@ -40,6 +40,12 @@
 
 (defn ->clj [^RespType resp-type]
   (let [unwrapped (.unwrap resp-type)]
-    (if (= (class resp-type) jresp.protocol.Err)
+    (cond
+      (= (class resp-type) jresp.protocol.Err)
       (ex-info unwrapped {:type :redis :msg unwrapped})
+
+      (= (class resp-type) jresp.protocol.Ary)
+      (vec unwrapped)
+
+      :else
       unwrapped)))
