@@ -76,6 +76,10 @@ public class ClientTest {
         return command("SMEMBERS", new BulkStr(key));
     }
 
+    private RespType hgetall(String key) {
+        return command("HGETALL", new BulkStr(key));
+    }
+
     private void await() {
         try {
             latch.await(5, TimeUnit.SECONDS);
@@ -165,5 +169,17 @@ public class ClientTest {
         await();
 
         assertNull(results.get(0).unwrap());
+    }
+
+    @Test
+    public void emptyResults() throws Exception {
+        int ops = 1;
+        latch = new CountDownLatch(ops);
+
+        con.write(Arrays.asList(hgetall("NO-SUCH-KEY")));
+
+        await();
+
+        assertEquals(Arrays.asList(), results.get(0).unwrap());
     }
 }

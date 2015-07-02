@@ -25,7 +25,7 @@ abstract class ScannableState implements State {
 
     private boolean endOfString(byte secondByte) {
         int idx = innerBuffer.writerIndex();
-        if (innerBuffer.writerIndex() == 0) {
+        if (idx == 0) {
             return false;
         }
         if ((innerBuffer.getByte(idx - 1) == Resp.CRLF[0]) &&

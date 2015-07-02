@@ -20,6 +20,12 @@ public class AryState implements State {
             if (intState.decode(in)) {
                 aryLength = (int)intState.finishInt();
                 ary = new ArrayList<>(aryLength);
+                if (aryLength == 0) {
+                    //
+                    // This is an empty array, so there will be no "nextState", so let's short-cut proceedings here
+                    //
+                    return true;
+                }
             }
         }
         if (in.readableBytes() == 0) {
