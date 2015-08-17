@@ -40,9 +40,8 @@ public class Client {
         readGroup.start();
     }
 
-    public Connection makeConnection(Responses responses) throws IOException {
+    public Connection makeConnection() throws IOException {
         Connection con = new Connection(hostname, port, writeGroup, readGroup);
-        con.start(responses);
         return con;
     }
 

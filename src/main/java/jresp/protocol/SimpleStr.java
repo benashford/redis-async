@@ -46,4 +46,19 @@ public class SimpleStr implements RespType {
     public Object unwrap() {
         return payload;
     }
+
+    @Override
+    public int hashCode() {
+        return payload.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof SimpleStr) {
+            SimpleStr ss = (SimpleStr)o;
+            return payload.equals(ss.payload);
+        } else {
+            return false;
+        }
+    }
 }
