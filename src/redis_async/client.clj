@@ -19,7 +19,6 @@
             [clojure.core.async :as a]
             [cheshire.core :as json]
             [redis-async.core :refer :all]
-            [redis-async.pool :as pool]
             [redis-async.protocol :as protocol]))
 
 ;; Internal utilities
@@ -94,7 +93,8 @@
 
 ;; Specific commands, the others are auto-generated later
 
-(defn monitor [pool]
+;;; TODO - replace with new-style
+#_(defn monitor [pool]
   (let [con     (get-connection pool :dedicated)
         close-c (a/chan)
         ret-c   (a/chan)
@@ -124,6 +124,7 @@
 
 ;; Blocking commands
 
+;;; TODO - move to new style
 (defn- blocking-command [cmd pool & params]
   (let [con   (get-connection pool :borrowed)
         ret-c (->> params
@@ -140,84 +141,7 @@
 
 ;; Pub-sub
 
-(defn- unsubscribe-from [subs channel]
-  (if-let [out-c (subs channel)]
-    (do
-      (a/close! out-c)
-      (dissoc subs channel))
-    subs))
-
-(defn- make-pub-sub [pool]
-  (let [p       (pool :pub-sub-c)
-        [con p] (pool/get-connection p)
-        in-c    (:in-c con)
-        subs    (atom {})
-        psubs   (atom {})]
-    (a/go
-      (loop [msg (a/<! in-c)]
-        (when msg
-          (let [[msg-type channel data] (:values msg)
-                msg-type                (protocol/->clj msg-type)
-                channel                 (protocol/->clj channel)]
-            (case msg-type
-              "subscribe" nil
-              "psubscribe" nil
-              "unsubscribe"
-              (swap! subs unsubscribe-from channel)
-              "punsubscribe"
-              (swap! psubs unsubscribe-from channel)
-              "message"
-              (when-let [out-ch (@subs channel)]
-                (a/>! out-ch data))
-              "pmessage"
-              (when-let [out-ch (@psubs channel)]
-                (a/>! out-ch data)))
-            (recur (a/<! in-c))))))
-    [p
-     {:cmd-ch (:cmd-ch con)
-      :subs   subs
-      :psubs  psubs}]))
-
-(defn- get-pub-sub [pool]
-  (let [pub-sub (promise)]
-    (swap! pool (fn [pool]
-                  (if-let [ps (:pub-sub pool)]
-                    (do
-                      (deliver pub-sub ps)
-                      pool)
-                    (let [[p ps] (make-pub-sub pool)]
-                      (deliver pub-sub ps)
-                      (assoc pool
-                             :pub-sub ps
-                             :pub-sub-c p)))))
-    @pub-sub))
-
-(def ^:private pub-sub-buffer-default 16)
-
-(defn- subscribe-to [subs channels c]
-  (reduce (fn [subs channel]
-            (assoc subs channel c))
-          subs
-          channels))
-
-(defn- subscribe-cmd [cmd ch-pool pool & channels]
-  (let [pub-sub (get-pub-sub pool)
-        ret-c   (a/chan pub-sub-buffer-default)
-        subs    (pub-sub ch-pool)]
-    (assert (not (nil? subs)))
-    (swap! subs subscribe-to channels ret-c)
-    (a/put! (:cmd-ch pub-sub) (command->resp cmd channels))
-    ret-c))
-
-(def subscribe (partial subscribe-cmd "SUBSCRIBE" :subs))
-(def psubscribe (partial subscribe-cmd "PSUBSCRIBE" :psubs))
-
-(defn unsubscribe-cmd [cmd pool & channels]
-  (let [pub-sub (get-pub-sub pool)]
-    (a/put! (:cmd-ch pub-sub) (command->resp cmd channels))))
-
-(def unsubscribe (partial unsubscribe-cmd "UNSUBSCRIBE"))
-(def punsubscribe (partial unsubscribe-cmd "PUNSUBSCRIBE"))
+;;; TODO - reimplement pub/sub
 
 ;; All other commands
 

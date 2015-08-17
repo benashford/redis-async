@@ -8,6 +8,10 @@ Available from Clojars:
 
 [![Clojars Project](http://clojars.org/redis-async/latest-version.svg)](http://clojars.org/redis-async)
 
+## Project status
+
+The version on Clojars is a beta, as such many things will not work.  The HEAD of master is currently in an inconsistent (and probably broken) state as functionality is being moved to the JRESP project for performance reasons.
+
 ## Design goals
 
 There are two primary design goals.  First, to be async, using `core.async`, for the purposes of being easily used in an application already heavily based around that.  Second, to be as close to the Redis API as much as possible; it is a low-level API, but a very useful one.
@@ -232,12 +236,12 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Check edge-cases (closing connections/errors/blocking operations).
-2. Release 0.2.0 version.
-3. Performance testing.
-4. Test coverage.
-5. Cluster support.
-6. Create Clojure 1.7 version using transducers
+1. Finish moving to latest JRESP, etc.
+2. Check edge-cases (closing connections/errors/blocking operations).
+3. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
+4. Performance testing.
+5. Test coverage.
+6. Cluster support.
 
 ## License
 

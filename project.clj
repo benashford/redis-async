@@ -1,4 +1,4 @@
-(defproject redis-async "0.2.0-beta2"
+(defproject redis-async "0.3.0-alpha1"
   :description "An asynchronous Redis client"
   :url "https://github.com/benashford/redis-async"
   :license {:name         "Apache Licence 2.0"
