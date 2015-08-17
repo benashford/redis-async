@@ -49,7 +49,7 @@ public class Resp {
                 return last;
             }
         }
-        ByteBuffer newBuffer = ByteBuffer.allocateDirect(Math.max(1460, size));
+        ByteBuffer newBuffer = ByteBuffer.allocate(Math.max(1460, size));
         buffers.add(newBuffer);
         return newBuffer;
     }

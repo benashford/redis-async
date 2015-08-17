@@ -18,6 +18,7 @@ package jresp.protocol;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Deque;
 
 public class BulkStr implements RespType {
@@ -74,6 +75,21 @@ public class BulkStr implements RespType {
             return new String(payload, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(payload);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof BulkStr) {
+            BulkStr bs = (BulkStr)o;
+            return Arrays.equals(payload, bs.payload);
+        } else {
+            return false;
         }
     }
 }

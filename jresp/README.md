@@ -4,7 +4,7 @@
 
 An asynchronous implementation of the [Redis Serialization Protocol (RESP)](http://redis.io/topics/protocol) in Java.
 
-This is *not* a Redis client, but rather a library specifically for the protocol to allow Redis clients to be built using it for various JVM languages.
+This is *not* a Redis client, although it might become one with time, but rather a library specifically for the protocol to allow Redis clients to be built using it for various JVM languages.
 
 ## Requirements
 
@@ -46,6 +46,15 @@ Nor does it make any attempt at connection pooling/reuse.  `Client` can create a
 There are pre-existing Redis clients for Java, both synchronous and asynchronous.  `jresp` was specifically intended to be the backend of multiple Redis clients for various JVM languages.
 
 As of the time of writing, it is used for [`redis-async`, a async Redis client for Clojure](https://github.com/benashford/redis-async).  I have written about the development of `jresp` and `redis-async` [here](http://benashford.github.io/blog/2015/06/02/java-in-a-polygot-jvm-world/)
+
+## TODO
+
+1. Move connection pool to JRESP layer.
+2. Implement class-of-commands at the JRESP layer - e.g. normal, blocking, pub-sub (may not be possible without taking care of each particular command), etc.
+3. Performance testing.
+4. Redis clustering.
+5. Create a full Java client (optional).
+6. Tests regarding dropped connections.
 
 ## Licence
 

@@ -39,8 +39,27 @@ public class Ary implements RespType {
         payload.stream().forEach(x -> x.writeBytes(out));
     }
 
+    public List<RespType> raw() {
+        return payload;
+    }
+
     @Override
     public Object unwrap() {
         return payload.stream().map(RespType::unwrap).collect(Collectors.toList());
+    }
+
+    @Override
+    public int hashCode() {
+        return payload.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof Ary) {
+            Ary a = (Ary)o;
+            return payload.equals(a.payload);
+        } else {
+            return false;
+        }
     }
 }

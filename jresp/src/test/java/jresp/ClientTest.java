@@ -23,85 +23,41 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-public class ClientTest {
-    private Client client;
-    private Connection con;
+public class ClientTest extends JRESPTest {
 
-    private CountDownLatch latch;
+    private Connection con;
 
     private List<RespType> results = new ArrayList<>();
 
     @Before
     public void setup() throws Exception {
-        client = new Client("localhost", 6379);
-        con = client.makeConnection(result -> {
+        super.setup();
+
+        con = client.makeConnection();
+        con.start(result -> {
             results.add(result);
             latch.countDown();
         });
         latch = new CountDownLatch(1);
-        con.write(Arrays.asList(flushDB()));
+        con.write(flushDB());
         latch.await();
         results.clear();
     }
 
     @After
     public void teardown() throws Exception {
-        client.shutdown();
-    }
-
-    private Ary command(String name, RespType... options) {
-        List<RespType> elements = new ArrayList<>(options.length + 1);
-        elements.add(new BulkStr(name));
-        elements.addAll(Arrays.asList(options));
-
-        return new Ary(elements);
-    }
-
-    private RespType ping() {
-        return command("PING");
-    }
-
-    private RespType flushDB() {
-        return command("FLUSHDB");
-    }
-
-    private RespType get(String key) {
-        return command("GET", new BulkStr(key));
-    }
-
-    private RespType set(String key, String value) {
-        return command("SET", new BulkStr(key), new BulkStr(value));
-    }
-
-    private RespType sadd(String key, String value) {
-        return command("SADD", new BulkStr(key), new BulkStr(value));
-    }
-
-    private RespType smembers(String key) {
-        return command("SMEMBERS", new BulkStr(key));
-    }
-
-    private RespType hgetall(String key) {
-        return command("HGETALL", new BulkStr(key));
-    }
-
-    private void await() {
-        try {
-            latch.await(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            throw new IllegalStateException(e);
-        }
+        super.teardown();
     }
 
     /**
@@ -111,7 +67,7 @@ public class ClientTest {
     public void testPing() throws Exception {
         latch = new CountDownLatch(1);
 
-        con.write(Arrays.asList(ping()));
+        con.write(ping());
 
         await();
         RespType result = results.get(0);
@@ -123,7 +79,8 @@ public class ClientTest {
     public void testPings() throws Exception {
         latch = new CountDownLatch(2);
 
-        con.write(Arrays.asList(ping(), ping()));
+        con.write(ping());
+        con.write(ping());
 
         await();
 
@@ -137,40 +94,49 @@ public class ClientTest {
     @Test
     public void thousandPingTest() throws Exception {
         int numPings = 1000;
+        int runs = 1;
 
-        latch = new CountDownLatch(numPings);
+        for (int n = 0; n < runs; n++) {
+            long start = System.nanoTime();
+            latch = new CountDownLatch(numPings);
 
-        con.write(IntStream.range(0, numPings).mapToObj(x -> ping()).collect(Collectors.toList()));
+            IntStream.range(0, numPings).forEach(x -> con.write(ping()));
 
-        await();
+            await();
+            System.out.printf("Done in %.2fms%n", (System.nanoTime() - start) / 1000000.0);
 
-        results.forEach(result -> assertEquals("PONG", result.unwrap()));
+            results.forEach(result -> assertEquals("PONG", result.unwrap()));
+        }
     }
 
-//    @Test
-//    public void benchmark() throws Exception {
-//        for (int c = 0; c < 50; c++) {
-//            int n = 1_000_000;
-//            latch = new CountDownLatch(n);
-//
-//            long start = System.nanoTime();
-//            con.write(IntStream.range(0, n).mapToObj(x -> set("foo", "bar")).collect(Collectors.toList()));
-//
-//            System.out.printf("Half way in: %.2fms%n", (System.nanoTime() - start) / 1000000.0);
-//
-//            await();
-//            results.clear();
-//            System.out.printf("Done in: %.2fms%n", (System.nanoTime() - start) / 1000000.0);
-//        }
-//    }
+    @Test
+    public void benchmark() throws Exception {
+        for (int c = 0; c < 1; c++) {
+            int n = 1_000_000;
+            latch = new CountDownLatch(n);
+
+            long start = System.nanoTime();
+            IntStream.range(0, n).forEach(x -> con.write(set("foo", "bar")));
+
+            System.out.printf("Half way in: %.2fms%n", (System.nanoTime() - start) / 1000000.0);
+
+            await();
+            results.clear();
+            System.out.printf("Done in: %.2fms%n", (System.nanoTime() - start) / 1000000.0);
+        }
+    }
 
     @Test
     public void getSetTest() throws Exception {
         int ops = 6;
         latch = new CountDownLatch(ops);
 
-        con.write(Arrays.asList(set("A", "1"), set("B", "x"), set("C", "This is the third string")));
-        con.write(Arrays.asList(get("A"), get("B"), get("C")));
+        con.write(set("A", "1"));
+        con.write(set("B", "x"));
+        con.write(set("C", "This is the third string"));
+        con.write(get("A"));
+        con.write(get("B"));
+        con.write(get("C"));
 
         await();
 
@@ -184,8 +150,10 @@ public class ClientTest {
         int ops = 4;
         latch = new CountDownLatch(ops);
 
-        con.write(Arrays.asList(sadd("D", "1"), sadd("D", "2"), sadd("D", "3")));
-        con.write(Arrays.asList(smembers("D")));
+        con.write(sadd("D", "1"));
+        con.write(sadd("D", "2"));
+        con.write(sadd("D", "3"));
+        con.write(smembers("D"));
 
         await();
 
@@ -197,7 +165,7 @@ public class ClientTest {
         int ops = 1;
         latch = new CountDownLatch(ops);
 
-        con.write(Arrays.asList(get("NO-SUCH-KEY")));
+        con.write(get("NO-SUCH-KEY"));
 
         await();
 
@@ -209,7 +177,7 @@ public class ClientTest {
         int ops = 1;
         latch = new CountDownLatch(ops);
 
-        con.write(Arrays.asList(hgetall("NO-SUCH-KEY")));
+        con.write(hgetall("NO-SUCH-KEY"));
 
         await();
 

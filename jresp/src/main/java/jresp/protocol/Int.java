@@ -40,4 +40,19 @@ public class Int implements RespType {
     public Object unwrap() {
         return payload;
     }
+
+    @Override
+    public int hashCode() {
+        return Long.hashCode(payload);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof Int) {
+            Int i = (Int)o;
+            return payload == i.payload;
+        } else {
+            return false;
+        }
+    }
 }
