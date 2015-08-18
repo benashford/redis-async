@@ -43,7 +43,7 @@ public class PubSubConnectionTest extends JRESPTest {
         sharedConnection.write(flushDB(), resp -> latch.countDown());
         await();
 
-        con = pool.getPubSubChannel();
+        con = pool.getPubSub();
     }
 
     @After
