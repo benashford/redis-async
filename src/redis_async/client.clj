@@ -188,13 +188,15 @@
 ;; DELETE ME - temporary functions for ad-hoc benchmarking
 
 (defn count-1000 [p]
-  (let [cs (mapv #(echo p (str %)) (range 1000))]
-    (mapv (fn [c i]
-            (let [v (<!! c)]
-              v))
-          cs
-          (range))))
+  (let [last-c (last (map #(echo p (str %)) (range 1000)))]
+    (a/<!! last-c)))
 
 (defn ping-1000 [p]
   (let [last-c (last (map (fn [_] (ping p)) (range 1000)))]
-    (<!! last-c)))
+    (a/<!! last-c)))
+
+(defn count-and-ping [p]
+  (let [cc (a/thread (count-1000 p))
+        pc (a/thread (ping-1000 p))]
+    (<!! cc)
+    (<!! pc)))
