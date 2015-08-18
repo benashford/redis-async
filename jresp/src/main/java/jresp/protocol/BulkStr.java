@@ -40,6 +40,10 @@ public class BulkStr implements RespType {
         this.payload = null;
     }
 
+    public String toString() {
+        return String.format("%s[%s]", getClass().getName(), Arrays.toString(payload));
+    }
+
     @Override
     public void writeBytes(Deque<ByteBuffer> out) {
         int size = 1;
