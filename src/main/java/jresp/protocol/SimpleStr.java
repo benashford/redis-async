@@ -27,6 +27,10 @@ public class SimpleStr implements RespType {
         payload = str;
     }
 
+    public String toString() {
+        return String.format("%s[%s]", getClass().getName(), payload);
+    }
+
     @Override
     public void writeBytes(Deque<ByteBuffer> out) {
         try {

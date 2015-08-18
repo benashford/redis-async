@@ -28,6 +28,10 @@ public class Ary implements RespType {
         this.payload = payload;
     }
 
+    public String toString() {
+        return String.format("%s[%s]", getClass().getName(), payload);
+    }
+
     @Override
     public void writeBytes(Deque<ByteBuffer> out) {
         byte[] header = Resp.longToByteArray(payload.size());

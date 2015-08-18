@@ -42,6 +42,16 @@ public class Pool {
         this.client = client;
     }
 
+    public String toString() {
+        return String.format("%s[client=%s,shared=%s,pubSub=%s,borrowable=%s,borrowed=%s]",
+                getClass().getName(),
+                client,
+                shared,
+                pubSub,
+                borrowable,
+                borrowed);
+    }
+
     /**
      * The shared connection is for the majority of Redis commands that return one single response.  JRESP will
      * automatically pipeline such commands for efficiency.
