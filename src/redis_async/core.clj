@@ -35,7 +35,8 @@
   (let [ret-c (a/chan)]
     (.write con resp-msg (proxy [Responses] []
                            (responseReceived [resp]
-                             (a/put! ret-c resp))))
+                             (a/put! ret-c resp)
+                             (a/close! ret-c))))
     ret-c))
 
 ;;; TODO - check if still required

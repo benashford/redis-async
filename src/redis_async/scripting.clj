@@ -18,15 +18,17 @@
             [redis-async.client :as client]
             [redis-async.protocol :as protocol]))
 
+(def ^:private misc (atom {}))
+
 (defn script-name->sha [pool script-name]
-  (get-in @pool [:misc :scripts script-name]))
+  (get-in @misc [pool :scripts script-name]))
 
 (defn save-script [pool script-name script-body]
   (if script-body
     (a/go
       (let [result (a/<! (client/script-load pool script-body))]
         (if-not (core/is-error? result)
-          (swap! pool assoc-in [:misc :scripts script-name] (protocol/->clj result)))
+          (swap! misc assoc-in [pool :scripts script-name] (protocol/->clj result)))
         result))
     (throw (ex-info "No script provided" {:name script-name}))))
 
