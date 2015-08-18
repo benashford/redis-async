@@ -37,12 +37,13 @@ public class BulkStrState implements State {
                  } else {
                      stringLength = (int)(len + 2); // To account for CRLF
                  }
+             } else {
+                 return false;
              }
         }
         if (stringLength < 0) {
             return true;
-        }
-        if (stringLength != null) {
+        } else {
             if (buffer == null) {
                 buffer = new byte[stringLength];
             }
@@ -58,7 +59,6 @@ public class BulkStrState implements State {
                 return readable == diff;
             }
         }
-        return false;
     }
 
     @Override
