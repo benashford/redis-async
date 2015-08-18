@@ -3,3 +3,4 @@ services:
   - redis-server
 jdk:
   - oraclejdk8
+script: ./gradlew check --info
