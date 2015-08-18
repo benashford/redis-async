@@ -112,14 +112,14 @@
               (if-not v
                 (do
                   (a/close! ret-c)
-                  (finish-connection pool :dedicated con))
+                  (close-connection pool con))
                 (do
                   (a/>! ret-c v)
                   (recur (a/alts! [in-c close-c])))))
             [ret-c close-c])
           (do
             (a/close! ret-c)
-            (finish-connection pool :dedicated con)
+            (close-connection pool con)
             nil))))))
 
 ;; Blocking commands
@@ -196,9 +196,5 @@
           (range))))
 
 (defn ping-1000 [p]
-  (let [cs (mapv (fn [_] (ping p)) (range 1000))]
-    (mapv (fn [c i]
-            (let [v (<!! c)]
-              v))
-          cs
-          (range))))
+  (let [last-c (last (map (fn [_] (ping p)) (range 1000)))]
+    (<!! last-c)))

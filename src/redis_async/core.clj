@@ -111,7 +111,7 @@
   (let [close-ch (send! con (protocol/->resp [finish-with]))]
     (a/go
       (let [result (a/<! close-ch)]
-        (finish-connection pool :borrowed con)
+        (finish-connection pool con)
         result))))
 
 (defn do-with-transaction [pool work-f]
