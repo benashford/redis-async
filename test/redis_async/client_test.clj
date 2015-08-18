@@ -78,7 +78,8 @@
 
 (use-fixtures :once redis-connect)
 
-(deftest monitor-test
+;;; TODO - re-enable this test
+#_(deftest monitor-test
   (client/wait!! (with-redis client/set "T1" "D1"))
   (client/wait!! (with-redis client/set "T2" "D2"))
   (let [[m-ch close-ch] (a/<!! (with-redis client/monitor))]

@@ -16,7 +16,8 @@
   (:require [clojure.core.async :as a]
             [clojure.string :as s]
             [redis-async.protocol :as protocol])
-  (:import [jresp Client]))
+  (:import [jresp Client Responses]
+           [jresp.pool Pool]))
 
 ;; Defaults
 
@@ -26,13 +27,15 @@
 
 ;; Commands
 
+;;; TODO - shouldn't really have a ! on it
 (defn send!
   "Send a command to a connection.  Returns a channel which will contain the
    result"
   [^jresp.pool.SingleCommandConnection con resp-msg]
   (let [ret-c (a/chan)]
-    (.write con resp-msg (fn [resp]
-                           (a/put! ret-c resp)))
+    (.write con resp-msg (proxy [Responses] []
+                           (responseReceived [resp]
+                             (a/put! ret-c resp))))
     ret-c))
 
 ;;; TODO - check if still required
@@ -125,3 +128,16 @@
 
 (defmacro with-transaction [pool & body]
   `(do-with-transaction ~pool (fn [] ~@body)))
+
+;; Pool management
+
+(defn make-pool [connection-info]
+  (let [connection-info (merge (default-redis) connection-info)
+        {host :host
+         port :port}    connection-info
+        client          (Client. host port)]
+    ;; TODO - authentication and database selection
+    (Pool. client)))
+
+(defn close-pool [^Pool pool]
+  (.shutdown pool))
