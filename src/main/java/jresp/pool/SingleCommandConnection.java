@@ -31,14 +31,19 @@ import java.util.Deque;
 public class SingleCommandConnection {
     private Connection connection;
 
-    private Deque<Responses> responseQueue = new ArrayDeque<>();
+    private final Deque<Responses> responseQueue = new ArrayDeque<>();
 
     public SingleCommandConnection(Connection connection) throws IOException, ConnectionException {
         this.connection = connection;
         this.connection.start(resp -> {
+            Responses respondTo = null;
             synchronized (responseQueue) {
-                responseQueue.pop().responseReceived(resp);
+                if (responseQueue.isEmpty()) {
+                    throw new IllegalStateException("Got an unexpected response: " + resp);
+                }
+                respondTo = responseQueue.pop();
             }
+            respondTo.responseReceived(resp);
         });
     }
 
