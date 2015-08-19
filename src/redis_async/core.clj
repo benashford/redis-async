@@ -13,11 +13,12 @@
 ;; limitations under the License.
 
 (ns redis-async.core
+  (:refer-clojure :exclude [send])
   (:require [clojure.core.async :as a]
             [clojure.string :as s]
             [redis-async.protocol :as protocol])
   (:import [jresp Client Responses]
-           [jresp.pool Pool]))
+           [jresp.pool Pool SingleCommandConnection]))
 
 ;; Defaults
 
@@ -27,11 +28,10 @@
 
 ;; Commands
 
-;;; TODO - shouldn't really have a ! on it
-(defn send!
+(defn send
   "Send a command to a connection.  Returns a channel which will contain the
    result"
-  [^jresp.pool.SingleCommandConnection con resp-msg]
+  [^SingleCommandConnection con resp-msg]
   (let [ret-c (a/chan)]
     (.write con resp-msg (proxy [Responses] []
                            (responseReceived [resp]
@@ -59,26 +59,6 @@
   (let [klass (class v)]
     (= klass jresp.protocol.Err)))
 
-;;; TODO - replace with new-style
-#_(defn- authenticate
-  "If authentication details are specified, send them before anything else on
-   this channel."
-  [cmd-ch in-c redis]
-  (let [password-c (when-let [password (:password redis)]
-                     (send! cmd-ch (protocol/->resp ["AUTH" password])))
-        select-c   (when-let [db (:db redis)]
-                     (send! cmd-ch (protocol/->resp ["SELECT" (str db)])))]
-    (when password-c
-      (a/take! password-c
-               (fn [response]
-                 (when (is-error? response)
-                   (a/put! in-c response)))))
-    (when select-c
-      (a/take! select-c
-               (fn [response]
-                 (when (is-error? response)
-                   (a/put! in-c response)))))))
-
 (defn get-connection
   "Get a connection from the pool"
   [^jresp.pool.Pool pool type]
@@ -105,11 +85,11 @@
   "Send a command to the appropriate pool, will use the shared connection"
   [pool command params]
   (let [con (or *trans-con* (get-connection pool :shared))]
-    (send! con
-           (protocol/->resp (concat command params)))))
+    (send con
+          (protocol/->resp (concat command params)))))
 
 (defn- finish-transaction [pool con finish-with]
-  (let [close-ch (send! con (protocol/->resp [finish-with]))]
+  (let [close-ch (send con (protocol/->resp [finish-with]))]
     (a/go
       (let [result (a/<! close-ch)]
         (finish-connection pool con)
@@ -117,8 +97,8 @@
 
 (defn do-with-transaction [pool work-f]
   (let [con    (get-connection pool :borrowed)
-        init-c (send! con
-                      (protocol/->resp ["MULTI"]))]
+        init-c (send con
+                     (protocol/->resp ["MULTI"]))]
     (try
       (binding [*trans-con* con]
         (work-f))

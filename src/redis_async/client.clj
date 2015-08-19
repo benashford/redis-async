@@ -13,7 +13,7 @@
 ;; limitations under the License.
 
 (ns redis-async.client
-  (:refer-clojure :exclude [time sync keys sort type get set eval])
+  (:refer-clojure :exclude [time sync keys sort type get set eval send])
   (:require [clojure.java.io :as io]
             [clojure.string :as s]
             [clojure.core.async :as a]
@@ -105,7 +105,7 @@
                   (a/put! cmd-ch [(protocol/->resp ["QUIT"]) (a/chan 1)])
                   (close-connection pool :dedicated con))]
     (a/go
-      (let [ok (a/<! (send! cmd-ch (protocol/->resp ["MONITOR"])))]
+      (let [ok (a/<! (send cmd-ch (protocol/->resp ["MONITOR"])))]
         (if (= (protocol/->clj ok) "OK")
           (do
             (a/go-loop [[v _] (a/alts! [in-c close-c])]
@@ -129,7 +129,7 @@
   (let [con   (get-connection pool :borrowed)
         ret-c (->> params
                    (command->resp cmd)
-                   (send! (:cmd-ch con)))]
+                   (send (:cmd-ch con)))]
     (a/go
       (let [res (a/<! ret-c)]
         (finish-connection pool :borrowed con)
