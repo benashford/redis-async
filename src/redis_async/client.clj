@@ -124,15 +124,14 @@
 
 ;; Blocking commands
 
-;;; TODO - move to new style
 (defn- blocking-command [cmd pool & params]
   (let [con   (get-connection pool :borrowed)
         ret-c (->> params
                    (command->resp cmd)
-                   (send (:cmd-ch con)))]
+                   (send con))]
     (a/go
       (let [res (a/<! ret-c)]
-        (finish-connection pool :borrowed con)
+        (finish-connection pool con)
         res))))
 
 (def blpop (partial blocking-command "BLPOP"))
