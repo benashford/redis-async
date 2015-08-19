@@ -16,27 +16,36 @@
 
 package jresp;
 
-import jresp.protocol.ClientErr;
-import jresp.protocol.RespType;
+import jresp.protocol.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * An individual connection
  */
 public class Connection {
-    private static final int PACKET_ESTIMATE = 1460;
+    private static final SimpleStr OK = new SimpleStr("OK");
 
     private static int serialNo = 1;
 
     final Integer id = serialNo++;
 
+    /**
+     * Connection details
+     */
     private String hostname;
     private int port;
+
+    private String password;
+    private Integer db;
 
     /**
      * The service threads
@@ -84,13 +93,59 @@ public class Connection {
         this.readGroup = readGroup;
     }
 
-    public void start(Responses responses) throws IOException {
-        this.responses = responses;
+    /**
+     * A private convenience function to send a command, only intended to be used to setup a connection, shouldn't
+     * be used by applications.
+     */
+    private RespType sendSync(String... command) throws InterruptedException {
+        List<RespType> resps = new ArrayList<>(1);
+        CountDownLatch latch = new CountDownLatch(1);
 
+        responses = resp -> {
+            resps.add(resp);
+            latch.countDown();
+        };
+
+        write(new Ary(Stream.of(command).map(BulkStr::new).collect(toList())));
+        latch.await();
+
+        responses = null;
+
+        return resps.get(0);
+    }
+
+    /**
+     * If either/or database or password is specified, ensure they are used when creating connections
+     */
+    private void loginAndSelect() throws ConnectionException {
+        try {
+            if (password != null) {
+                RespType response = sendSync("AUTH", password);
+                if (!response.equals(OK)) {
+                    throw new ConnectionException("Invalid password: " + response);
+                }
+            }
+
+            if (db != null) {
+                RespType response = sendSync("SELECT", Integer.toString(db));
+                if (!response.equals(OK)) {
+                    throw new ConnectionException(String.format("Invalid database: %d (%s)", db, response));
+                }
+            }
+        } catch (InterruptedException e) {
+            throw new ConnectionException(e);
+        }
+    }
+
+    public void start(Responses responses) throws IOException, ConnectionException {
         this.channel = SocketChannel.open(new InetSocketAddress(hostname, port));
         this.channel.configureBlocking(false);
         writeGroup.add(this);
         readGroup.add(this);
+
+        loginAndSelect();
+
+        this.responses = responses;
     }
 
     void shutdown() throws IOException {
@@ -153,6 +208,14 @@ public class Connection {
 
     void reportException(Exception e) {
         responses.responseReceived(new ClientErr(e));
+    }
+
+    void setPassword(String password) {
+        this.password = password;
+    }
+
+    void setDb(Integer db) {
+        this.db = db;
     }
 }
 

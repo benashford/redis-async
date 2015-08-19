@@ -18,6 +18,7 @@ package jresp.pool;
 
 import jresp.Client;
 import jresp.Connection;
+import jresp.ConnectionException;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -61,7 +62,7 @@ public class Pool {
      *
      * Because this is shared, the connection will be started.
      */
-    public synchronized SingleCommandConnection getShared() throws IOException {
+    public synchronized SingleCommandConnection getShared() throws IOException, ConnectionException {
         if (shared == null) {
             shared = new SingleCommandConnection(client.makeConnection());
         }
@@ -83,7 +84,7 @@ public class Pool {
      * A borrowed connection is one that a borrower has exclusive use of until it is returned.  The borrower must
      * return it to avoid any leaks.  It is used mainly for blocking commands like BLPOP.
      */
-    public synchronized SingleCommandConnection getBorrowed() throws IOException {
+    public synchronized SingleCommandConnection getBorrowed() throws IOException, ConnectionException {
         if (borrowable.isEmpty()) {
             borrowable.add(new SingleCommandConnection(client.makeConnection()));
         }
@@ -112,7 +113,7 @@ public class Pool {
      * Return a shared pub-sub channel.  A Redis connection that is subscribed to a channel cannot be used for other
      * purposes
      */
-    public synchronized PubSubConnection getPubSub() throws IOException {
+    public synchronized PubSubConnection getPubSub() throws IOException, ConnectionException {
         if (pubSub == null) {
             pubSub = new PubSubConnection(client.makeConnection());
         }

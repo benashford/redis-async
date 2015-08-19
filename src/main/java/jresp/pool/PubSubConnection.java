@@ -17,6 +17,7 @@
 package jresp.pool;
 
 import jresp.Connection;
+import jresp.ConnectionException;
 import jresp.Responses;
 import jresp.protocol.Ary;
 import jresp.protocol.BulkStr;
@@ -38,7 +39,7 @@ public class PubSubConnection {
     private Map<BulkStr, Responses> subscriptions = new HashMap<>();
     private Map<BulkStr, Responses> psubscriptions = new HashMap<>();
 
-    PubSubConnection(Connection connection) throws IOException {
+    PubSubConnection(Connection connection) throws IOException, ConnectionException {
         this.connection = connection;
         this.connection.start(this::incoming);
     }

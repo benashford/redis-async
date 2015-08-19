@@ -26,6 +26,9 @@ public class Client {
 
     private final int port;
 
+    private String password;
+    private Integer db;
+
     private final ConnectionWriteGroup writeGroup;
     private final ConnectionReadGroup readGroup;
 
@@ -40,8 +43,18 @@ public class Client {
         readGroup.start();
     }
 
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public void setDb(Integer db) {
+        this.db = db;
+    }
+
     public Connection makeConnection() throws IOException {
         Connection con = new Connection(hostname, port, writeGroup, readGroup);
+        con.setPassword(password);
+        con.setDb(db);
         return con;
     }
 
