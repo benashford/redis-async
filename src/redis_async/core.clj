@@ -137,7 +137,10 @@
         {host :host
          port :port}    connection-info
         client          (Client. host port)]
-    ;; TODO - authentication and database selection
+    (if-let [password (:password connection-info)]
+      (.setPassword client password))
+    (if-let [db (:db connection-info)]
+      (.setDb client (int db)))
     (Pool. client)))
 
 (defn close-pool [^Pool pool]

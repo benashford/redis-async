@@ -15,7 +15,7 @@
   (client/wait!! (client/set *redis-pool* "TEST-STRING" "STRING-VALUE")))
 
 (defn redis-connect [f]
-  (binding [*redis-pool* (core/make-pool {:db "1"})]
+  (binding [*redis-pool* (core/make-pool {:db 1})]
     (is-ok (client/<!! (client/flushdb *redis-pool*)))
     (load-seed-data)
     (f)
