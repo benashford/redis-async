@@ -18,20 +18,23 @@ It also provides a way of communicating with a Redis server called [`Connection`
 
 When creating a `Connection` an object/closure implementing [`Responses`](src/main/java/jresp/Responses.java) needs to be provided.  Messages are written using the `write` method on `Connection`; each response from the server will result in `responseReceived` on the implementation of `Responses`.
 
+A higher-level [`Pool`](src/main/java/jresp/pool/Pool.java) can be used for connection pooling.
+
 Example:
 
 ```java
 Client c = new Client("localhost", 6379);
-Connection con = c.makeConnection(resp -> System.out.println("Got:" + resp));
-
-con.write(Arrays.asList(new Ary(Arrays.asList(new BulkStr("PING")))));
+Pool p = new Pool(c);
+p.getShared().write(new Ary(Arrays.asList(new BulkStr("PING"))), resp -> System.out.println("Got: " + resp));
 ```
 
 This should print: `Got: PONG`
 
 The final line of that example looks a bit verbose.  This is because communication between client and server takes place using RESP objects; each command to Redis is a RESP array containing one or more bulk strings for the command name and arguments.
 
-Redis commands can be pipelined: multiple commands can be sent in one request, the responses will then be sent back from the server.  This is why `write` on `Connection` accepts a `Collection` of `RespType`.  Each response will be a one call to the `Responses` callback.  Each response will be an implementation of `RespType`, the exact type will depend on the Redis command called, see the [Redis command documentation](http://redis.io/commands) for details.
+JRESP implements implicit pipelining.  Multiple commands are sent by calling `write` multiple times, the commands are serialized and written to a buffer.  The buffer will send data across the wire to Redis when the socket signals it is ready for more data, as much data as is possible, comprising multiple commands, will be sent in one request.
+
+Each response will be an implementation of `RespType`, the exact type will depend on the Redis command called, see the [Redis command documentation](http://redis.io/commands) for details.
 
 Every `RespType` can be converted to the corresponding Java type by calling `unwrap`.  E.g a `BulkStr` becomes a `String`.  This is a recursive process for RESP arrays, the array becomes a `List` and each element of the array has `unwrap` called in turn.
 
@@ -47,7 +50,7 @@ As of the time of writing, it is used for [`redis-async`, a async Redis client f
 
 ## TODO
 
-1. Database selection/authentication (probably needs to be at the JRESP layer, because of the connection pool).
+1. Document pub/sub facilities and connection pool more.
 2. Performance testing.
 3. Redis clustering.
 4. Create a full Java client (optional).

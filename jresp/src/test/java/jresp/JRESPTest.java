@@ -35,6 +35,7 @@ public class JRESPTest {
 
     protected void setup() throws Exception {
         client = new Client("localhost", 6379);
+        client.setDb(2);
     }
 
     protected void teardown() throws Exception {
@@ -91,7 +92,10 @@ public class JRESPTest {
 
     protected void await() {
         try {
-            latch.await(5, TimeUnit.SECONDS);
+            boolean success = latch.await(5, TimeUnit.SECONDS);
+            if (!success) {
+                throw new AssertionError("Timed out waiting");
+            }
         } catch (InterruptedException e) {
             throw new IllegalStateException(e);
         }

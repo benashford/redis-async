@@ -17,6 +17,7 @@
 package jresp.pool;
 
 import jresp.Connection;
+import jresp.ConnectionException;
 import jresp.Responses;
 import jresp.protocol.RespType;
 
@@ -32,7 +33,7 @@ public class SingleCommandConnection {
 
     private Deque<Responses> responseQueue = new ArrayDeque<>();
 
-    public SingleCommandConnection(Connection connection) throws IOException {
+    public SingleCommandConnection(Connection connection) throws IOException, ConnectionException {
         this.connection = connection;
         this.connection.start(resp -> {
             synchronized (responseQueue) {
