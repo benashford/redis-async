@@ -19,6 +19,7 @@ package jresp.pool;
 import jresp.Connection;
 import jresp.ConnectionException;
 import jresp.Responses;
+import jresp.protocol.EndOfResponses;
 import jresp.protocol.RespType;
 
 import java.io.IOException;
@@ -35,7 +36,15 @@ public class SingleCommandConnection {
 
     public SingleCommandConnection(Connection connection) throws IOException, ConnectionException {
         this.connection = connection;
-        this.connection.start(resp -> {
+        this.connection.start(this::dispatcher);
+    }
+
+    private void dispatcher(RespType resp) {
+        if (resp instanceof EndOfResponses) {
+            synchronized (responseQueue) {
+                responseQueue.forEach(responder -> responder.responseReceived(resp));
+            }
+        } else {
             Responses respondTo = null;
             synchronized (responseQueue) {
                 if (responseQueue.isEmpty()) {
@@ -44,7 +53,7 @@ public class SingleCommandConnection {
                 respondTo = responseQueue.pop();
             }
             respondTo.responseReceived(resp);
-        });
+        }
     }
 
     public void write(RespType command, Responses responses) {

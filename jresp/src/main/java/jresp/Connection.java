@@ -151,6 +151,8 @@ public class Connection {
     void shutdown() throws IOException {
         shutdown = true;
 
+        responses.responseReceived(new EndOfResponses());
+
         channel.close();
     }
 
@@ -192,7 +194,7 @@ public class Connection {
         }
     }
 
-    void readTick() {
+    void readTick() throws IOException {
         try {
             int bytes = channel.read(readBuffer);
             //System.out.println("Read: " + bytes);
@@ -200,10 +202,9 @@ public class Connection {
             List<RespType> out = new ArrayList<>();
             decoder.decode(readBuffer, out);
             out.forEach(responses::responseReceived);
-        } catch (IOException e) {
-            responses.responseReceived(new ClientErr(e));
+        } finally {
+            readBuffer.clear();
         }
-        readBuffer.clear();
     }
 
     void reportException(Exception e) {

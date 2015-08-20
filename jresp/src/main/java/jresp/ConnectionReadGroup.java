@@ -41,19 +41,24 @@ public class ConnectionReadGroup extends Thread {
     }
 
     public void run() {
-        while (!shutdown) {
-            try {
+        try {
+            while (!shutdown) {
                 selector.select(10);
                 Set<SelectionKey> keys = selector.selectedKeys();
                 for (SelectionKey key : keys) {
-                    Integer id = (Integer)key.attachment();
+                    Integer id = (Integer) key.attachment();
                     Connection con = connections.get(id);
-                    con.readTick();
+                    try {
+                        con.readTick();
+                    } catch (IOException e) {
+                        con.reportException(e);
+                        con.shutdown();
+                    }
                 }
-            } catch (IOException e) {
-                // TODO - notify the clients
-                throw new RuntimeException(e);
             }
+        } catch (IOException e) {
+            shutdown();
+            throw new RuntimeException(e);
         }
     }
 

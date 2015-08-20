@@ -54,12 +54,16 @@ public class PubSubConnectionTest extends JRESPTest {
     @Test
     public void pubSubTest() throws Exception {
         List<String> responses = new ArrayList<>();
-        latch = new CountDownLatch(3);
+        latch = new CountDownLatch(1);
 
         con.subscribe("TEST-CHANNEL", resp -> {
             responses.add((String) resp.unwrap());
             latch.countDown();
         });
+
+        await();
+        responses.clear();
+        latch = new CountDownLatch(3);
 
         SingleCommandConnection sharedConnection = pool.getShared();
         sharedConnection.write(publish("TEST-CHANNEL", "ahoy"), NULL_RESPONSES);
