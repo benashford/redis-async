@@ -20,27 +20,19 @@ import java.nio.ByteBuffer;
 import java.util.Deque;
 
 /**
- * Not part of the RESP spec.  Used internally within JRESP and Redis clients based on JRESP to send exceptions
- * to waiting functions.
+ * Not an official part of the RESP spec, used to indicate that no more responses will be sent in this context.
+ *
+ * e.g. after unsubscribing to something that was previously subscribed
  */
-public class ClientErr implements RespType {
-    private Throwable error;
-
-    public ClientErr(Throwable error) {
-        this.error = error;
-    }
-
-    public String toString() {
-        return String.format("%s[%s]", getClass().getName(), error.getMessage());
-    }
+public class EndOfResponses implements RespType {
 
     @Override
     public void writeBytes(Deque<ByteBuffer> out) {
-        throw new UnsupportedOperationException("This cannot be written anywhere, this is only to be used within the client");
+        throw new UnsupportedOperationException("Should not be sent anywhere");
     }
 
     @Override
     public Object unwrap() {
-        return error;
+        return null;
     }
 }

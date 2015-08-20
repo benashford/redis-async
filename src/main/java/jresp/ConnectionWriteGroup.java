@@ -40,12 +40,12 @@ public class ConnectionWriteGroup extends Thread {
         setDaemon(true);
     }
 
+    @SuppressWarnings("SuspiciousMethodCalls")
     public void run() {
-        // TODO - shutdown gracefully
-        while (!shutdown) {
-            Set<Connection> cons = signaller.reset();
-            while (!cons.isEmpty()) {
-                try {
+        try {
+            while (!shutdown) {
+                Set<Connection> cons = signaller.reset();
+                while (!cons.isEmpty()) {
                     selector.select(10);
                     Set<SelectionKey> keys = selector.selectedKeys();
                     for (SelectionKey key : keys) {
@@ -55,14 +55,19 @@ public class ConnectionWriteGroup extends Thread {
                                 connection.writeTick();
                             } catch (IOException e) {
                                 connection.reportException(e);
+                                connection.shutdown();
                             }
                         }
                     }
-                } catch (IOException e) {
-                    // TODO - notify the clients
-                    throw new RuntimeException(e);
                 }
             }
+        } catch (IOException e) {
+            try {
+                shutdown();
+            } catch (IOException e2) {
+                throw new RuntimeException(e2);
+            }
+            throw new RuntimeException(e);
         }
     }
 
