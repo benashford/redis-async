@@ -149,6 +149,12 @@ For scripts too long/unweildy to be defined in-line, the `defscript` can be comb
 (defscript test-script (from "path-to-package/test-script.lua"))
 ```
 
+### Error handling
+
+Error handling is currently rudimentary.  If an unrecoverable error occurs (e.g. server being unavailable), all open channels will close and new commands may be rejected.  In this case the pool should be closed and a new one created.
+
+The roadmap includes improving this to automatically retry/reconnect.
+
 ## Why not just use ...?
 
 TBC: list of similarities and differences with other libraries
@@ -238,11 +244,12 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 1. Finish moving to latest JRESP, etc.
 2. Test pub/sub connections.
-3. Check edge-cases (closing connections/errors/blocking operations).
-4. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
-5. Performance testing.
-6. Test coverage.
-7. Cluster support.
+3. Check edge-cases (closing connections/errors/blocking operations).  Include self-repairing connections (reconnecting, etc.).
+4. Implement MONITOR.
+5. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
+6. Performance testing.
+7. Test coverage.
+8. Cluster support.
 
 ## License
 

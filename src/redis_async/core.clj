@@ -46,22 +46,6 @@
     (.write con resp-msg (make-single-response-handler ret-c))
     ret-c))
 
-;;; TODO - check if still required
-(defn- write-error-to [ch t]
-  (a/put! ch (protocol/->resp t)))
-
-;;; TODO - check if still required
-(defn- drain
-  "If a connection has failed, respond to the remaining incoming messages with
-   an error."
-  [ch t]
-  (a/go-loop [cmd (a/<! ch)]
-    (when-let [ret-c (:ret-c cmd)]
-      (write-error-to ret-c t)
-      (a/close! ret-c)
-      (recur (a/<! ch)))))
-
-;;; TODO - check if still required
 (defn is-error? [v]
   (let [klass (class v)]
     (= klass jresp.protocol.Err)))
@@ -82,7 +66,10 @@
    ^jresp.pool.SingleCommandConnection con]
   (.returnBorrowed pool con))
 
-;;; TODO - close connection functions (for borrowed/dedicated)
+(defn close-connection
+  "Close a dedicated connection once finished"
+  [^jresp.Connection con]
+  (.stop con))
 
 ;; Standard send-command
 
