@@ -26,6 +26,16 @@
   {:host (or (System/getenv "REDIS_HOST") "localhost")
    :port 6379})
 
+;; Response handlers
+
+(defn- make-single-response-handler
+  "Make a response handler, that writes to a specific channel"
+  [ret-c]
+  (proxy [Responses] []
+    (responseReceived [resp]
+      (a/put! ret-c resp)
+      (a/close! ret-c))))
+
 ;; Commands
 
 (defn send
@@ -33,10 +43,7 @@
    result"
   [^SingleCommandConnection con resp-msg]
   (let [ret-c (a/chan)]
-    (.write con resp-msg (proxy [Responses] []
-                           (responseReceived [resp]
-                             (a/put! ret-c resp)
-                             (a/close! ret-c))))
+    (.write con resp-msg (make-single-response-handler ret-c))
     ret-c))
 
 ;;; TODO - check if still required
