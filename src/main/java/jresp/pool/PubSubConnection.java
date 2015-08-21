@@ -79,7 +79,7 @@ public class PubSubConnection {
         connection.write(new Ary(Arrays.asList(PSUBSCRIBE, patternResp)));
     }
 
-    public void pubsubscribe(String pattern) throws PubSubException {
+    public void punsubscribe(String pattern) throws PubSubException {
         BulkStr patternResp = new BulkStr(pattern);
         synchronized (psubscriptions) {
             if (!psubscriptions.containsKey(patternResp)) {
