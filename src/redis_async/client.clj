@@ -141,9 +141,11 @@
 
 ;; Pub-sub
 
+(def ^:private pub-sub-channel-size 16)
+
 (defn subscribe [pool channel]
   (let [^PubSubConnection con (get-connection pool :pub-sub)
-        ch                    (a/chan)]
+        ch                    (a/chan pub-sub-channel-size (drop 1))]
     (.subscribe con channel (make-stream-response-handler ch))
     ch))
 
@@ -153,7 +155,7 @@
 
 (defn psubscribe [pool pattern]
   (let [^PubSubConnection con (get-connection pool :pub-sub)
-        ch                    (a/chan)]
+        ch                    (a/chan pub-sub-channel-size (drop 1))]
     (.psubscribe con pattern (make-stream-response-handler ch))
     ch))
 
