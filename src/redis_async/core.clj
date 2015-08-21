@@ -26,6 +26,16 @@
   {:host (or (System/getenv "REDIS_HOST") "localhost")
    :port 6379})
 
+;; is? functions
+
+(defn is-error? [v]
+  (let [klass (class v)]
+    (= klass jresp.protocol.Err)))
+
+(defn is-end-of-channel? [v]
+  (let [klass (class v)]
+    (= klass jresp.protocol.EndOfResponses)))
+
 ;; Response handlers
 
 (defn- make-single-response-handler
@@ -36,6 +46,15 @@
       (a/put! ret-c resp)
       (a/close! ret-c))))
 
+(defn make-stream-response-handler
+  "Make a response handler that streams to a specific channel"
+  [ret-c]
+  (proxy [Responses] []
+    (responseReceived [resp]
+      (if (is-end-of-channel? resp)
+        (a/close! ret-c)
+        (a/put! ret-c resp)))))
+
 ;; Commands
 
 (defn send
@@ -45,10 +64,6 @@
   (let [ret-c (a/chan)]
     (.write con resp-msg (make-single-response-handler ret-c))
     ret-c))
-
-(defn is-error? [v]
-  (let [klass (class v)]
-    (= klass jresp.protocol.Err)))
 
 (defn get-connection
   "Get a connection from the pool"

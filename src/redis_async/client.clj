@@ -19,7 +19,8 @@
             [clojure.core.async :as a]
             [cheshire.core :as json]
             [redis-async.core :refer :all]
-            [redis-async.protocol :as protocol]))
+            [redis-async.protocol :as protocol])
+  (:import [jresp.pool PubSubConnection]))
 
 ;; Internal utilities
 
@@ -141,6 +142,26 @@
 ;; Pub-sub
 
 ;;; TODO - reimplement pub/sub
+
+(defn subscribe [pool channel]
+  (let [^PubSubConnection con (get-connection pool :pub-sub)
+        ch                    (a/chan)]
+    (.subscribe con channel (make-stream-response-handler ch))
+    ch))
+
+(defn unsubscribe [pool channel]
+  (let [^PubSubConnection con (get-connection pool :pub-sub)]
+    (.unsubscribe con channel)))
+
+(defn psubscribe [pool pattern]
+  (let [^PubSubConnection con (get-connection pool :pub-sub)
+        ch                    (a/chan)]
+    (.psubscribe con pattern (make-stream-response-handler ch))
+    ch))
+
+(defn punsubscribe [pool pattern]
+  (let [^PubSubConnection con (get-connection pool :pub-sub)]
+    (.punsubscribe con pattern)))
 
 ;; All other commands
 
