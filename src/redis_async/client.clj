@@ -141,8 +141,6 @@
 
 ;; Pub-sub
 
-;;; TODO - reimplement pub/sub
-
 (defn subscribe [pool channel]
   (let [^PubSubConnection con (get-connection pool :pub-sub)
         ch                    (a/chan)]
