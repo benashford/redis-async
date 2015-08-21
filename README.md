@@ -243,13 +243,12 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 ## Still to-do
 
 1. Finish moving to latest JRESP, etc.
-2. Test pub/sub connections.
-3. Check edge-cases (closing connections/errors/blocking operations).  Include self-repairing connections (reconnecting, etc.).
-4. Implement MONITOR.
-5. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
-6. Performance testing.
-7. Test coverage.
-8. Cluster support.
+2. Check edge-cases (closing connections/errors/blocking operations).  Include self-repairing connections (reconnecting, etc.).
+3. Implement MONITOR.
+4. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
+5. Performance testing.
+6. Test coverage.
+7. Cluster support.
 
 ## License
 
