@@ -218,6 +218,10 @@ public class Connection {
     void setDb(Integer db) {
         this.db = db;
     }
+
+    public boolean isShutdown() {
+        return shutdown;
+    }
 }
 
 class OutgoingBuffer {

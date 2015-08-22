@@ -201,4 +201,8 @@ public class PubSubConnection {
             responses.responseReceived(i.next());
         }
     }
+
+    public boolean isShutdown() {
+        return connection.isShutdown();
+    }
 }

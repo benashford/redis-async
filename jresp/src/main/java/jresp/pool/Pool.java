@@ -63,7 +63,7 @@ public class Pool {
      * Because this is shared, the connection will be started.
      */
     public synchronized SingleCommandConnection getShared() throws IOException, ConnectionException {
-        if (shared == null) {
+        if ((shared == null) || (shared.isShutdown())) {
             shared = new SingleCommandConnection(client.makeConnection());
         }
 
@@ -85,16 +85,19 @@ public class Pool {
      * return it to avoid any leaks.  It is used mainly for blocking commands like BLPOP.
      */
     public synchronized SingleCommandConnection getBorrowed() throws IOException, ConnectionException {
-        if (borrowable.isEmpty()) {
-            borrowable.add(new SingleCommandConnection(client.makeConnection()));
+        Iterator<SingleCommandConnection> i = borrowable.iterator();
+        while (i.hasNext()) {
+            SingleCommandConnection con = i.next();
+            i.remove();
+
+            if (!con.isShutdown()) {
+                borrowed.add(con);
+                return con;
+            }
         }
 
-        Iterator<SingleCommandConnection> i = borrowable.iterator();
-        SingleCommandConnection con = i.next();
-        i.remove();
-
+        SingleCommandConnection con = new SingleCommandConnection(client.makeConnection());
         borrowed.add(con);
-
         return con;
     }
 
@@ -114,7 +117,7 @@ public class Pool {
      * purposes
      */
     public synchronized PubSubConnection getPubSub() throws IOException, ConnectionException {
-        if (pubSub == null) {
+        if ((pubSub == null) || (pubSub.isShutdown())) {
             pubSub = new PubSubConnection(client.makeConnection());
         }
         return pubSub;
