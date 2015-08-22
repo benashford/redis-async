@@ -49,7 +49,7 @@
       (if (isa? (class value) clojure.lang.ExceptionInfo)
         (throw value)
         value))
-    (throw (ex-info "Expected message, actually nil" {}))))
+    nil))
 
 (defmacro <! [expr]
   `(read-value (a/<! ~expr)))
