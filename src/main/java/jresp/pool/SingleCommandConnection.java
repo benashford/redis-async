@@ -71,4 +71,8 @@ public class SingleCommandConnection {
             connection.write(command);
         }
     }
+
+    public boolean isShutdown() {
+        return connection.isShutdown();
+    }
 }
