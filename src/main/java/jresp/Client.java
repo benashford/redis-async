@@ -29,18 +29,14 @@ public class Client {
     private String password;
     private Integer db;
 
-    private final ConnectionWriteGroup writeGroup;
-    private final ConnectionReadGroup readGroup;
+    private final ConnectionGroup group;
 
     public Client(String hostname, int port) throws IOException {
         this.hostname = hostname;
         this.port = port;
 
-        writeGroup = new ConnectionWriteGroup();
-        writeGroup.start();
-
-        readGroup = new ConnectionReadGroup();
-        readGroup.start();
+        group = new ConnectionGroup();
+        group.start();
     }
 
     public void setPassword(String password) {
@@ -52,14 +48,13 @@ public class Client {
     }
 
     public Connection makeConnection() throws IOException {
-        Connection con = new Connection(hostname, port, writeGroup, readGroup);
+        Connection con = new Connection(hostname, port, group);
         con.setPassword(password);
         con.setDb(db);
         return con;
     }
 
     public void shutdown() throws IOException {
-        writeGroup.shutdown();
-        readGroup.shutdown();
+        group.shutdown();
     }
 }
