@@ -55,7 +55,7 @@ public class ConnectionWriteGroup extends Thread {
                                 connection.writeTick();
                             } catch (IOException e) {
                                 connection.reportException(e);
-                                connection.shutdown();
+                                connection.stop();
                             }
                         }
                     }

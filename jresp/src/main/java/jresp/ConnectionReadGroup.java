@@ -48,11 +48,15 @@ public class ConnectionReadGroup extends Thread {
                 for (SelectionKey key : keys) {
                     Integer id = (Integer) key.attachment();
                     Connection con = connections.get(id);
-                    try {
-                        con.readTick();
-                    } catch (IOException e) {
-                        con.reportException(e);
-                        con.shutdown();
+                    if (key.isValid()) {
+                        try {
+                            con.readTick();
+                        } catch (IOException e) {
+                            con.reportException(e);
+                            con.stop();
+                        }
+                    } else {
+                        con.stop();
                     }
                 }
             }
