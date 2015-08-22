@@ -20,7 +20,8 @@
             [cheshire.core :as json]
             [redis-async.core :refer :all]
             [redis-async.protocol :as protocol])
-  (:import [jresp.pool PubSubConnection]))
+  (:import [jresp Connection]
+           [jresp.pool PubSubConnection]))
 
 ;; Internal utilities
 
@@ -94,33 +95,29 @@
 
 ;; Specific commands, the others are auto-generated later
 
-;;; TODO - replace with new-style
-#_(defn monitor [pool]
-  (let [con     (get-connection pool :dedicated)
-        close-c (a/chan)
-        ret-c   (a/chan)
-        cmd-ch  (:cmd-ch con)
-        in-c    (:in-c con)
-        quit    (fn []
-                  (a/close! ret-c)
-                  (a/put! cmd-ch [(protocol/->resp ["QUIT"]) (a/chan 1)])
-                  (close-connection pool :dedicated con))]
+(defn monitor [pool]
+  (let [^Connection con (get-connection pool :dedicated)
+        close-c         (a/chan)
+        r-r-c           (a/chan)
+        ret-c           (a/chan)]
+    (.start con (make-stream-response-handler ret-c))
+    (.write con (protocol/->resp ["MONITOR"]))
     (a/go
-      (let [ok (a/<! (send cmd-ch (protocol/->resp ["MONITOR"])))]
+      (let [ok (a/<! ret-c)]
         (if (= (protocol/->clj ok) "OK")
           (do
-            (a/go-loop [[v _] (a/alts! [in-c close-c])]
+            (a/go-loop [[v _] (a/alts! [ret-c close-c])]
               (if-not v
                 (do
-                  (a/close! ret-c)
-                  (close-connection pool con))
+                  (a/close! r-r-c)
+                  (.write con (protocol/->resp ["QUIT"])))
                 (do
-                  (a/>! ret-c v)
-                  (recur (a/alts! [in-c close-c])))))
-            [ret-c close-c])
+                  (a/>! r-r-c v)
+                  (recur (a/alts! [ret-c close-c])))))
+            [r-r-c close-c])
           (do
-            (a/close! ret-c)
-            (close-connection pool con)
+            (a/close! r-r-c)
+            (close-connection con)
             nil))))))
 
 ;; Blocking commands
