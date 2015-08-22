@@ -110,7 +110,7 @@
               (if-not v
                 (do
                   (a/close! r-r-c)
-                  (.write con (protocol/->resp ["QUIT"])))
+                  (.write ^Connection con (protocol/->resp ["QUIT"])))
                 (do
                   (a/>! r-r-c v)
                   (recur (a/alts! [ret-c close-c])))))
