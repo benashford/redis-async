@@ -21,8 +21,12 @@ import jresp.protocol.*;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 
@@ -48,10 +52,9 @@ public class Connection {
     private Integer db;
 
     /**
-     * The service threads
+     * The service thread
      */
-    private ConnectionWriteGroup writeGroup;
-    private ConnectionReadGroup readGroup;
+    private ConnectionGroup group;
 
     /**
      * The callback for incoming data
@@ -62,11 +65,12 @@ public class Connection {
      * The socket channel
      */
     SocketChannel channel;
+    private SelectionKey selectionKey;
 
     /**
      * The outgoing buffer
      */
-    private OutgoingBuffer outgoing = new OutgoingBuffer();
+    private final OutgoingBuffer outgoing = new OutgoingBuffer();
 
     /**
      * Decoder
@@ -78,6 +82,9 @@ public class Connection {
      */
     private ByteBuffer readBuffer = ByteBuffer.allocateDirect(5285);  // 1460 - PACKET ESTIMATE
 
+    /**
+     * Has this been shutdown
+     */
     private boolean shutdown = false;
 
     /**
@@ -85,12 +92,10 @@ public class Connection {
      */
     Connection(String hostname,
                int port,
-               ConnectionWriteGroup writeGroup,
-               ConnectionReadGroup readGroup) {
+               ConnectionGroup group) {
         this.hostname = hostname;
         this.port = port;
-        this.writeGroup = writeGroup;
-        this.readGroup = readGroup;
+        this.group = group;
     }
 
     /**
@@ -140,8 +145,8 @@ public class Connection {
     public void start(Responses responses) throws IOException, ConnectionException {
         this.channel = SocketChannel.open(new InetSocketAddress(hostname, port));
         this.channel.configureBlocking(false);
-        writeGroup.add(this);
-        readGroup.add(this);
+
+        this.selectionKey = group.add(this);
 
         loginAndSelect();
 
@@ -151,16 +156,37 @@ public class Connection {
     void shutdown() throws IOException {
         shutdown = true;
 
-        responses.responseReceived(new EndOfResponses());
+        if (responses != null) {
+            // Tell anything waiting that there will be no more data
+            responses.responseReceived(new EndOfResponses());
+        }
 
         channel.close();
     }
 
     public void stop() throws IOException {
-        writeGroup.remove(this);
-        readGroup.remove(this);
+        if (!shutdown) {
+            group.remove(this);
 
-        shutdown();
+            shutdown();
+        }
+    }
+
+    private void writeInterest(boolean on) {
+        int interestOps = selectionKey.interestOps();
+        boolean isOn = (interestOps & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE;
+
+        if (isOn && on) {
+            return;
+        } else if (isOn) {
+            selectionKey.interestOps(interestOps & ~SelectionKey.OP_WRITE);
+            selectionKey.selector().wakeup();
+        } else if (on) {
+            selectionKey.interestOps(interestOps | SelectionKey.OP_WRITE);
+            selectionKey.selector().wakeup();
+        } else {
+            return;
+        }
     }
 
     public void write(RespType message) {
@@ -171,9 +197,11 @@ public class Connection {
         Deque<ByteBuffer> out = new ArrayDeque<>();
 
         message.writeBytes(out);
-        outgoing.addAll(out);
 
-        writeGroup.signal(this);
+        synchronized (outgoing) {
+            outgoing.addAll(out);
+            writeInterest(true);
+        }
     }
 
     void writeTick() throws IOException {
@@ -189,19 +217,25 @@ public class Connection {
             outgoing.addFirst(buff);
         }
 
-        if (!outgoing.isEmpty()) {
-            writeGroup.signal(this);
+        synchronized (outgoing) {
+            if (outgoing.isEmpty()) {
+                writeInterest(false);
+            }
         }
     }
 
     void readTick() throws IOException {
         try {
             int bytes = channel.read(readBuffer);
-            //System.out.println("Read: " + bytes);
-            readBuffer.flip();
-            List<RespType> out = new ArrayList<>();
-            decoder.decode(readBuffer, out);
-            out.forEach(responses::responseReceived);
+            if (bytes < 0) {
+                // This socket is closed, there will be no more data
+                shutdown();
+            } else {
+                readBuffer.flip();
+                List<RespType> out = new ArrayList<>();
+                decoder.decode(readBuffer, out);
+                out.forEach(responses::responseReceived);
+            }
         } finally {
             readBuffer.clear();
         }
@@ -224,75 +258,3 @@ public class Connection {
     }
 }
 
-class OutgoingBuffer {
-    private static final int MAX_MERGED_BUFFER_SIZE = 1460;
-
-    private Deque<ByteBuffer> buffer = new ArrayDeque<>();
-
-    /**
-     * All ByteBuffers must be in write mode at this point, they'll get flipped by this buffer
-     */
-    synchronized void addAll(Collection<ByteBuffer> col) {
-        if (buffer.isEmpty() && col.size() == 1) {
-            ByteBuffer bb = col.iterator().next();
-            if (bb.position() <= MAX_MERGED_BUFFER_SIZE) {
-                bb.flip();
-                buffer.add(bb);
-                return;
-            }
-        } else {
-            ByteBuffer tmp = null;
-            if (!buffer.isEmpty()) {
-                ByteBuffer last = buffer.removeLast();
-                if (last.remaining() <= MAX_MERGED_BUFFER_SIZE) {
-                    tmp = ByteBuffer.allocate(MAX_MERGED_BUFFER_SIZE);
-                    tmp.put(last);
-                }
-            }
-            for (ByteBuffer bb : col) {
-                if ((tmp == null) && (bb.position() <= MAX_MERGED_BUFFER_SIZE)) {
-                    tmp = bb;
-                } else {
-                    bb.flip(); // put in read mode
-                    while (bb.hasRemaining()) {
-                        if (tmp == null) {
-                            tmp = ByteBuffer.allocate(MAX_MERGED_BUFFER_SIZE);
-                        }
-                        int tmpRemaining = tmp.remaining();
-                        if (tmpRemaining == 0) {
-                            tmp.flip();
-                            buffer.add(tmp);
-                            tmp = null;
-                        } else if (bb.remaining() <= tmpRemaining) {
-                            tmp.put(bb);
-                        } else {
-                            byte[] buffer = new byte[tmpRemaining];
-                            bb.get(buffer);
-                            tmp.put(buffer);
-                        }
-                    }
-                }
-            }
-            if (tmp != null) {
-                tmp.flip();
-                buffer.add(tmp);
-            }
-        }
-    }
-
-    public synchronized boolean isEmpty() {
-        return buffer.isEmpty();
-    }
-
-    public synchronized void addFirst(ByteBuffer bb) {
-        buffer.addFirst(bb);
-    }
-
-    public synchronized ByteBuffer pop() {
-        if (buffer.isEmpty()) {
-            return null;
-        } else {
-            return buffer.pop();
-        }
-    }
-}
