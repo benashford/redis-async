@@ -239,11 +239,12 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 * 0.1.1 - additional high-level scripting functionality.
 * 0.1.2 - fixed inconsistencies dealing with Error responses, and also making sure that the first error is reported when dealing with script compilation errors.
 * 0.2.0 - Uses [JRESP](https://github.com/benashford/jresp) for serialising RESP.
+* 0.3.0 - Significant performance/stability improvements achieved by moving connection pooling/pipelining/etc. into the JRESP layer.
 
 ## Still to-do
 
-1. Check edge-cases (closing connections/errors/blocking operations).  Include self-repairing connections (reconnecting, etc.).
-2. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
+1. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
+2. Release first 0.3.0 beta.
 3. Performance testing.
 4. Test coverage.
 5. Cluster support.
