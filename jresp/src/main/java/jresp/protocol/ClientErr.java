@@ -27,7 +27,11 @@ public class ClientErr implements RespType {
     private Throwable error;
 
     public ClientErr(Throwable error) {
-        this.error = error;
+        if (error == null) {
+            throw new NullPointerException("error");
+        } else {
+            this.error = error;
+        }
     }
 
     public String toString() {

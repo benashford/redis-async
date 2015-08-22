@@ -19,6 +19,7 @@ package jresp.pool;
 import jresp.Connection;
 import jresp.ConnectionException;
 import jresp.Responses;
+import jresp.protocol.ClientErr;
 import jresp.protocol.EndOfResponses;
 import jresp.protocol.RespType;
 
@@ -48,11 +49,19 @@ public class SingleCommandConnection {
             Responses respondTo = null;
             synchronized (responseQueue) {
                 if (responseQueue.isEmpty()) {
-                    throw new IllegalStateException("Got an unexpected response: " + resp);
+                    if (resp instanceof ClientErr) {
+                        // There are no waiting responses, so nowhere to send the response to.
+                    } else {
+                        // There is a response but nowhere to send it to.
+                        throw new IllegalStateException("Got an unexpected response: " + resp);
+                    }
+                } else {
+                    respondTo = responseQueue.pop();
                 }
-                respondTo = responseQueue.pop();
             }
-            respondTo.responseReceived(resp);
+            if (respondTo != null) {
+                respondTo.responseReceived(resp);
+            }
         }
     }
 
