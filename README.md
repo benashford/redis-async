@@ -10,7 +10,7 @@ Available from Clojars:
 
 ## Project status
 
-The version on Clojars is a beta, as such many things will not work.  The HEAD of master is currently in an inconsistent (and probably broken) state as functionality is being moved to the JRESP project for performance reasons.
+The version on Clojars is a beta.
 
 ## Design goals
 
@@ -243,10 +243,11 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Release first 0.3.0 beta.
-2. Performance testing.
+1. Performance testing.
+2. Additional configuration options (e.g. level of buffering)
 3. Test coverage.
-4. Cluster support.
+4. Documentation (especially around edge-cases, e.g. lost connection).
+5. Cluster support.
 
 ## License
 
