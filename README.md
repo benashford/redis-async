@@ -243,11 +243,10 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 
 ## Still to-do
 
-1. Ensure all Redis commands (e.g. version 3 onwards) are implemented.
-2. Release first 0.3.0 beta.
-3. Performance testing.
-4. Test coverage.
-5. Cluster support.
+1. Release first 0.3.0 beta.
+2. Performance testing.
+3. Test coverage.
+4. Cluster support.
 
 ## License
 
