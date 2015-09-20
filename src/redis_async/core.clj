@@ -95,7 +95,8 @@
   [pool command params]
   (let [con (or *trans-con* (get-connection pool :shared))]
     (send con
-          (protocol/->resp (concat command params)))))
+          (protocol/->resp (concat (map protocol/cmd->resp command)
+                                   params)))))
 
 (defn- finish-transaction [pool con finish-with]
   (let [close-ch (send con (protocol/->resp [finish-with]))]

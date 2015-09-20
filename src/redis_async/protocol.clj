@@ -38,6 +38,11 @@
   (->resp [this]
     (BulkStr.)))
 
+(defn cmd->resp
+  "Command strings can, and probably should, be cached"
+  [^String cmd-str]
+  (BulkStr/get cmd-str))
+
 (defn ->clj [^RespType resp-type]
   (let [unwrapped (.unwrap resp-type)]
     (cond

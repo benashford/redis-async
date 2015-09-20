@@ -90,7 +90,7 @@
 (defn- command->resp [command args]
   (->> args
        (map coerce-to-string)
-       (cons command)
+       (cons (protocol/cmd->resp command))
        protocol/->resp))
 
 ;; Specific commands, the others are auto-generated later
@@ -101,7 +101,7 @@
         r-r-c           (a/chan)
         ret-c           (a/chan)]
     (.start con (make-stream-response-handler ret-c))
-    (.write con (protocol/->resp ["MONITOR"]))
+    (.write con (protocol/->resp [(protocol/cmd->resp "MONITOR")]))
     (a/go
       (let [ok (a/<! ret-c)]
         (if (= (protocol/->clj ok) "OK")
@@ -110,7 +110,8 @@
               (if-not v
                 (do
                   (a/close! r-r-c)
-                  (.write ^Connection con (protocol/->resp ["QUIT"])))
+                  (.write ^Connection con
+                          (protocol/->resp [(protocol/cmd->resp "QUIT")])))
                 (do
                   (a/>! r-r-c v)
                   (recur (a/alts! [ret-c close-c])))))
