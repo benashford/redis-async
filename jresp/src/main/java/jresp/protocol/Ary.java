@@ -17,6 +17,7 @@
 package jresp.protocol;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,6 +27,10 @@ public class Ary implements RespType {
 
     public Ary(List<RespType> payload) {
         this.payload = payload;
+    }
+
+    public Ary(RespType... payload) {
+        this.payload = Arrays.asList(payload);
     }
 
     public String toString() {

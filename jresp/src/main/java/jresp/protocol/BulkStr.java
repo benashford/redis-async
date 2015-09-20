@@ -18,10 +18,11 @@ package jresp.protocol;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Deque;
+import java.util.*;
 
 public class BulkStr implements RespType {
+    private static final Map<String, BulkStr> cache = Collections.synchronizedMap(new HashMap<>());
+
     private byte[] payload;
 
     public BulkStr(String s) {
@@ -38,6 +39,15 @@ public class BulkStr implements RespType {
 
     public BulkStr() {
         this.payload = null;
+    }
+
+    public static BulkStr get(String str) {
+        BulkStr val = cache.get(str);
+        if (val == null) {
+            val = new BulkStr(str);
+            cache.put(str, val);
+        }
+        return val;
     }
 
     public String toString() {
