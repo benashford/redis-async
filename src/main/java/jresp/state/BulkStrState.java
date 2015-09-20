@@ -16,16 +16,38 @@
 
 package jresp.state;
 
+import jresp.RespDecoder;
 import jresp.protocol.BulkStr;
 import jresp.protocol.RespType;
 
 import java.nio.ByteBuffer;
 
 public class BulkStrState implements State {
-    private IntState intState = new IntState();
+    private static final int DEFAULT_SIZE = 32;
+    private static final int MAXIMUM_SIZE = DEFAULT_SIZE * 1000;
+
+    private RespDecoder parent;
+    private IntState intState;
     private Integer stringLength = null;
     private byte[] buffer = null;
     private int idx = 0;
+
+    public BulkStrState(RespDecoder parent) {
+        this.parent = parent;
+        this.intState = parent.intDecoder();
+    }
+
+    public BulkStrState reset() {
+        intState.reset();
+        stringLength = null;
+        idx = 0;
+
+        if (buffer != null && buffer.length > MAXIMUM_SIZE) {
+            buffer = null;
+        }
+
+        return this;
+    }
 
     @Override
     public boolean decode(ByteBuffer in) {
@@ -44,7 +66,7 @@ public class BulkStrState implements State {
         if (stringLength < 0) {
             return true;
         } else {
-            if (buffer == null) {
+            if (buffer == null || buffer.length < stringLength) {
                 buffer = new byte[stringLength];
             }
             int diff = stringLength - idx;

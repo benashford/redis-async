@@ -51,7 +51,7 @@ public class RespDecoderTest {
     private final List<RespType> decode(Collection<ByteBuffer> in) {
         List<RespType> out = new ArrayList<>();
         for (ByteBuffer bb : in) {
-            decoder.decode(bb, out);
+            decoder.decode(bb, out::add);
         }
         return out;
     }

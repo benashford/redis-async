@@ -23,8 +23,17 @@ import java.nio.charset.Charset;
 
 abstract class ScannableState implements State {
     private static final int DEFAULT_SIZE = 32;
+    private static final int MAXIMUM_SIZE = 32 * 1000;
     private byte[] buffer = new byte[DEFAULT_SIZE];
     private int idx = 0;
+
+    public ScannableState reset() {
+        if (buffer.length > MAXIMUM_SIZE) {
+            buffer = new byte[DEFAULT_SIZE];
+        }
+        idx = 0;
+        return this;
+    }
 
     @Override
     public boolean decode(ByteBuffer in) {

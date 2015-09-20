@@ -25,10 +25,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AryState implements State {
-    private IntState intState = new IntState();
+    private RespDecoder parent;
+
+    private IntState intState;
     private Integer aryLength = null;
     private List<RespType> ary = null;
     private State nextState = null;
+
+    public AryState(RespDecoder parent) {
+        this.parent = parent;
+        this.intState = parent.intDecoder();
+    }
 
     @Override
     public boolean decode(ByteBuffer in) {
@@ -49,7 +56,7 @@ public class AryState implements State {
                 return false;
             }
             if (nextState == null) {
-                nextState = RespDecoder.nextState((char) in.get());
+                nextState = parent.nextState((char) in.get());
             }
             if (nextState.decode(in)) {
                 ary.add(nextState.finish());

@@ -80,7 +80,7 @@ public class Connection {
     /**
      * Read buffer
      */
-    private ByteBuffer readBuffer = ByteBuffer.allocateDirect(5285);  // 1460 - PACKET ESTIMATE
+    private ByteBuffer readBuffer = ByteBuffer.allocate(32000);  // 1460 - PACKET ESTIMATE
 
     /**
      * Has this been shutdown
@@ -205,9 +205,13 @@ public class Connection {
     }
 
     void writeTick() throws IOException {
-        ByteBuffer buff = outgoing.pop();
-        if (buff == null) {
-            return;
+        ByteBuffer buff;
+        synchronized (outgoing) {
+            buff = outgoing.pop();
+            if (buff == null) {
+                writeInterest(false);
+                return;
+            }
         }
 
         channel.write(buff);
@@ -215,12 +219,6 @@ public class Connection {
         if (buff.hasRemaining()) {
             // Data remaining, so putting at the front of the queue for the next time around
             outgoing.addFirst(buff);
-        }
-
-        synchronized (outgoing) {
-            if (outgoing.isEmpty()) {
-                writeInterest(false);
-            }
         }
     }
 
@@ -232,9 +230,7 @@ public class Connection {
                 shutdown();
             } else {
                 readBuffer.flip();
-                List<RespType> out = new ArrayList<>();
-                decoder.decode(readBuffer, out);
-                out.forEach(responses::responseReceived);
+                decoder.decode(readBuffer, responses::responseReceived);
             }
         } finally {
             readBuffer.clear();
