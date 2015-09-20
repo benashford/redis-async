@@ -161,7 +161,9 @@ TBC: list of similarities and differences with other libraries
 
 ## Performance
 
-TODO: some benchmarks
+Current performance (tested against the 0.3.1 release) is approximately half as good as Carmine (i.e. run-time for tested operations is twice as long).
+
+Compared to JRESP, the runtime of `redis-async` for similar problems is seven times longer.
 
 ### Implicit pipelining
 
