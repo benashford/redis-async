@@ -41,16 +41,16 @@
 (defn- make-single-response-handler
   "Make a response handler, that writes to a specific channel"
   [ret-c]
-  (proxy [Responses] []
-    (responseReceived [resp]
+  (reify Responses
+    (responseReceived [this resp]
       (a/put! ret-c resp)
       (a/close! ret-c))))
 
 (defn make-stream-response-handler
   "Make a response handler that streams to a specific channel"
   [ret-c]
-  (proxy [Responses] []
-    (responseReceived [resp]
+  (reify Responses
+    (responseReceived [this resp]
       (if (is-end-of-channel? resp)
         (a/close! ret-c)
         (a/put! ret-c resp)))))
@@ -61,8 +61,9 @@
   "Send a command to a connection.  Returns a channel which will contain the
    result"
   [^SingleCommandConnection con resp-msg]
-  (let [ret-c (a/chan)]
-    (.write con resp-msg (make-single-response-handler ret-c))
+  (let [ret-c  (a/chan)
+        resp-h (make-single-response-handler ret-c)]
+    (.write con resp-msg resp-h)
     ret-c))
 
 (defn get-connection
@@ -93,10 +94,9 @@
 (defn send-cmd
   "Send a command to the appropriate pool, will use the shared connection"
   [pool command params]
-  (let [con (or *trans-con* (get-connection pool :shared))]
-    (send con
-          (protocol/->resp (concat (map protocol/cmd->resp command)
-                                   params)))))
+  (let [con     (or *trans-con* (get-connection pool :shared))
+        payload (protocol/->resp (concat command params))]
+    (send con payload)))
 
 (defn- finish-transaction [pool con finish-with]
   (let [close-ch (send con (protocol/->resp [finish-with]))]
