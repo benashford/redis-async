@@ -30,10 +30,12 @@
     (Int. this))
   clojure.lang.ISeq
   (->resp [^clojure.lang.ISeq this]
-    (Ary. (map ->resp this)))
+    (let [^java.util.List elements (mapv ->resp this)]
+      (Ary. elements)))
   clojure.lang.PersistentVector
   (->resp [^clojure.lang.PersistentVector this]
-    (Ary. (map ->resp this)))
+    (let [^java.util.List elements (mapv ->resp this)]
+      (Ary. elements)))
   nil
   (->resp [this]
     (BulkStr.)))
