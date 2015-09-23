@@ -29,11 +29,11 @@
   (->resp [^Number this]
     (Int. this))
   clojure.lang.ISeq
-  (->resp [^clojure.lang.ISeq this]
+  (->resp [this]
     (let [^java.util.List elements (mapv ->resp this)]
       (Ary. elements)))
   clojure.lang.PersistentVector
-  (->resp [^clojure.lang.PersistentVector this]
+  (->resp [this]
     (let [^java.util.List elements (mapv ->resp this)]
       (Ary. elements)))
   nil
