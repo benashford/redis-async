@@ -165,7 +165,7 @@ Current performance (tested against the 0.3.1 release) is approximately half as 
 
 Compared to JRESP, the runtime of `redis-async` for similar problems is seven times longer.
 
-### Implicit pipelining
+## Implicit pipelining
 
 Unlike most other Redis clients, `redis-async` will automatically pipeline multiple commands issued within a similar frame of time into a single request/response cycle.  It does so in a way that does not harm the worst case, but significantly improves the best case.
 
