@@ -159,12 +159,6 @@ The roadmap includes improving this to automatically retry/reconnect.
 
 TBC: list of similarities and differences with other libraries
 
-## Performance
-
-Current performance (tested against the 0.3.1 release) is approximately half as good as Carmine (i.e. run-time for tested operations is twice as long).
-
-Compared to JRESP, the runtime of `redis-async` for similar problems is seven times longer.
-
 ## Implicit pipelining
 
 Unlike most other Redis clients, `redis-async` will automatically pipeline multiple commands issued within a similar frame of time into a single request/response cycle.  It does so in a way that does not harm the worst case, but significantly improves the best case.
@@ -231,6 +225,50 @@ T 127.0.0.1:6379 -> 127.0.0.1:55817 [AP]
 ##
 ```
 
+## Performance
+
+The 0.3.x series of releases have significantly improved performance compared to earlier versions; and starting with 0.3.2 performance is very good, being as-fast and usual faster than the competition.
+
+Version 0.3.2 was tested against Carmine version 2.11.1.  The test was the same as the one used in the [JRESP performance tests](https://github.com/benashford/jresp#performance), specifically 1,000,000 SET commands.  These are based on tests originally developed for Stefan Wille's [test for a Redis client in Crystal](https://www.stefanwille.com/2015/05/redis-clients-crystal-vs-ruby-vs-c-vs-go/).
+
+The test was repeated ten times for each.
+
+[`redis-async`](https://github.com/benashford/redis-client-benchmarks/blob/master/Clojure/async-test/src/async_test/core.clj) obtained the following times:
+
+```
+Took: 2825.58ms
+Took: 2193.04ms
+Took: 2141.28ms
+Took: 2108.30ms
+Took: 2156.06ms
+Took: 2028.24ms
+Took: 2061.57ms
+Took: 2282.01ms
+Took: 2200.28ms
+Took: 2264.24ms
+```
+
+[Carmine](https://github.com/benashford/redis-client-benchmarks/blob/master/Clojure/car-test/src/car_test/core.clj) obtained the following times:
+
+```
+Took: 4785.35ms
+Took: 4530.83ms
+Took: 3599.26ms
+Took: 2668.91ms
+Took: 3854.12ms
+Took: 2801.31ms
+Took: 3691.85ms
+Took: 2642.10ms
+Took: 3697.83ms
+Took: 2703.41ms
+```
+
+Compared to Carmine, it appears that `redis-async` is between 15 to 40% faster.
+
+DISCLAIMER: this is one arbitrary, and not very realistic test.  These tests should be replaced with more typical usage patterns.
+
+It is also worth comparing these results with the performance results obtained from JRESP alone (the library that `redis-async` uses), the same test was performed by JRESP in approximately 1200ms.
+
 ## Testing
 
 To run tests `lein test`.  Please not this requires a Redis instance running on `localhost` and the default Redis port.  Also, please note, this will trash anything in database 1 on that instance.
@@ -242,14 +280,14 @@ To run tests `lein test`.  Please not this requires a Redis instance running on 
 * 0.1.2 - fixed inconsistencies dealing with Error responses, and also making sure that the first error is reported when dealing with script compilation errors.
 * 0.2.0 - Uses [JRESP](https://github.com/benashford/jresp) for serialising RESP.
 * 0.3.0 - Significant performance/stability improvements achieved by moving connection pooling/pipelining/etc. into the JRESP layer.
+* 0.3.1 and 0.3.2 - Performance improvements.
 
 ## Still to-do
 
-1. Performance testing.
-2. Additional configuration options (e.g. level of buffering)
-3. Test coverage.
-4. Documentation (especially around edge-cases, e.g. lost connection).
-5. Cluster support.
+1. Test coverage.
+2. Documentation (especially around edge-cases, e.g. lost connection).
+3. Cluster support.
+4. More realistic scenarios for performance testing.
 
 ## License
 
