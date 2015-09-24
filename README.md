@@ -102,7 +102,7 @@ redis-async.client> (rpush p "LIST1" "Some Data")
 
 ##### Pub/sub
 
-Redis has a [publish/subscribe mechanism](http://redis.io/topics/pubsub).  Once again the semantics for these commands differ from the default.  Once subscribed to a (Redis) channel, the connection will contain multiple messages that are sent to that channel; therefore connections that are used for pub/sub need to be kept appart from those normally used.
+Redis has a [publish/subscribe mechanism](http://redis.io/topics/pubsub).  Once again the semantics for these commands differ from the default.  Once subscribed to a (Redis) channel, the connection will contain multiple messages that are sent to that channel; therefore connections that are used for pub/sub need to be kept apart from those normally used.
 
 However there are similarities, a single connection can alter the channels that it is subscribed to, allowing a single connection to be used the library can route messages.
 
@@ -263,7 +263,7 @@ Took: 3697.83ms
 Took: 2703.41ms
 ```
 
-Compared to Carmine, it appears that `redis-async` is between 15 to 40% faster.
+Compared to Carmine, it appears that `redis-async` elapsed time is between 15 to 40% shorter.
 
 DISCLAIMER: this is one arbitrary, and not very realistic test.  These tests should be replaced with more typical usage patterns.
 
