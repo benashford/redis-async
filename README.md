@@ -23,6 +23,10 @@ There are two primary design goals.  First, to be async, using `core.async`, for
 * Implicit pipelining.
 * Support for transactions.
 
+## Missing features
+
+* Support for clustering
+
 ## How to use
 
 ### Simple interactive example
